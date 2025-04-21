@@ -6,10 +6,10 @@ from torch.utils.data import Dataset
 from transformers import GPT2Tokenizer
 
 
-class STF_Datasets(Dataset):
+class SFT_Datasets(Dataset):
     def __init__(self,device="cuda",block_size=77)->None:
         super().__init__()
-        print("Load STF Datasets.")
+        print("Load SFT Datasets.")
         self.device = device
         self.block_size = block_size
 
