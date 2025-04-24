@@ -8,15 +8,15 @@ from src.configs import get_configs
 
 
 tic=time.time()
-def train(batch_size, exp_name,step,card):
-    device =f'cuda:{card}'
+def train(batch_size, exp_name, step, card):
+    device = f'cuda:{card}'
     cfg = get_configs("gpt2-medium")
     cfg.max_steps = step
     cfg.exp_name = exp_name
     cfg.batch_size = batch_size
 
     model = GPTActor.from_pretrained(cfg)
-    train_ds = SFT_Datasets(block_size=256,device=device) # 模型一次处理的最大token数
+    train_ds = SFT_Datasets( block_size=256, device=device ) # block_size 模型一次处理的最大token数
     trainer = SFTTrainer_head(cfg, device, model, train_ds)
     trainer.fit()
 
