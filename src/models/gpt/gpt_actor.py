@@ -33,14 +33,14 @@ class GPTActor(nn.Module):
                                      cfg.vocab_size,
                                      bias=False)
 
-        # 预测权重的线性层5分类（特定任务）
+        # 预测权重的线性层5分类（特定任务） 输入维度（Transformer隐藏层维度），输出维度
         self.predict_weight_token = nn.Linear(cfg.embedding_dim, 5, bias=False)
         # 预测差分步数的线性层3分类（特定任务）
         self.predict_diffstep_token = nn.Linear(cfg.embedding_dim, 3, bias=False)
 
     def forward(self, x: Tensor, attention_mask: Tensor = None):
         """
-        x: Shape of (B, T)
+        x: Shape of (B, T) Batch_size,
         """
         x = self.transformer(x, attention_mask)  # x = (B, T, embedding_dim) （B,T,d）
         logits = self.lm_head(x)  # logits = (B, T, voca_size)
@@ -59,24 +59,22 @@ class GPTActor(nn.Module):
         x (B, T)
         """
         logits, diffw, diffstep = self.forward(x, attention_mask)  # logits = (B, T, voca_size)
-        # token预测
+        # token预测    dim表示在哪个维度上进行softmax操作
         log_prob_all_vocab = F.log_softmax(logits[:, :-1, :], dim=2)  # (B, T-1, vocab_size)
         index = x[:, 1:].unsqueeze(-1)  # (B, T-1, 1)获取真实token索引
-        log_prob_output = log_prob_all_vocab.gather(dim=2,
-                                                    index=index)  # teacher-forcing, get the prob of each gt token
+        log_prob_output = log_prob_all_vocab.gather(dim=2, index=index) # teacher-forcing, get the prob of each gt token
         # 权重预测
-        log_prob_all_w = F.log_softmax(diffw[:, :-1, :], dim=2)  # (B, T-1, vocab_size)
+        log_prob_all_w = F.log_softmax(diffw[:, :-1, :], dim=2)  # (B, T-1, 5)
         w_index = torch.ones(log_prob_all_w.shape[:2]).long().unsqueeze(-1).to(diffw.device) * 2
-        log_prob_w_output = log_prob_all_w.gather(dim=2,
-                                                  index=w_index)  # teacher-forcing, get the prob of each gt token
+        log_prob_w_output = log_prob_all_w.gather(dim=2, index=w_index)
         # 步数预测
-        log_prob_all_step = F.log_softmax(diffstep[:, :-1, :], dim=2)  # (B, T-1, vocab_size)
+        log_prob_all_step = F.log_softmax(diffstep[:, :-1, :], dim=2)  # (B, T-1, 3)
         step_index = torch.ones(log_prob_all_w.shape[:2]).long().unsqueeze(-1).to(diffw.device)
-        log_prob_step_output = log_prob_all_step.gather(dim=2,
-                                                        index=step_index)  # teacher-forcing, get the prob of each gt token
+        log_prob_step_output = log_prob_all_step.gather(dim=2, index=step_index)
 
-        return log_prob_output[:, -num_actions:, 0], log_prob_w_output[:, -num_actions:, 0], log_prob_step_output[:,
-                                                                                             -num_actions:, 0]  # (B, T)
+        return (log_prob_output[:, -num_actions:, 0],
+                log_prob_w_output[:, -num_actions:, 0],
+                log_prob_step_output[:, -num_actions:, 0])  # (B, T)
 
     # 批量生成序列及对应的权重和步数预测
     @torch.no_grad()
