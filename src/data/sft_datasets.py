@@ -43,7 +43,6 @@ class SFT_Datasets(Dataset):
             suffix = "" if "<|endoftext|>" in processed_text else "<|endoftext|>"
             response = tokenizer(processed_text + suffix)
 
-
             all_tokens.extend(response["input_ids"])
 
         self.tokens = torch.tensor(all_tokens, dtype=torch.long)

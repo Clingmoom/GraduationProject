@@ -59,22 +59,29 @@ class GPTActor(nn.Module):
         x (B, T)
         """
         logits, diffw, diffstep = self.forward(x, attention_mask)  # logits = (B, T, voca_size)
-        # token预测    dim表示在哪个维度上进行softmax操作
+        # token预测
         log_prob_all_vocab = F.log_softmax(logits[:, :-1, :], dim=2)  # (B, T-1, vocab_size)
         index = x[:, 1:].unsqueeze(-1)  # (B, T-1, 1)获取真实token索引
-        log_prob_output = log_prob_all_vocab.gather(dim=2, index=index) # teacher-forcing, get the prob of each gt token
+        # input.gather(dim，index):
+        # 根据给定的索引（index）张量，
+        # 从源张量（input）沿指定的维度（dim）抓取对应位置的值，放入新张量
+        # index各个维度大小要与input除dim外保持一致
+        # dim表示在哪个维度上进行softmax操作
+        # gather输出形状是index的形状
+        log_prob_output = log_prob_all_vocab.gather(dim=2, index=index) # 教师强制：取出真实下一个 token 的对数概率
+
         # 权重预测
         log_prob_all_w = F.log_softmax(diffw[:, :-1, :], dim=2)  # (B, T-1, 5)
         w_index = torch.ones(log_prob_all_w.shape[:2]).long().unsqueeze(-1).to(diffw.device) * 2
-        log_prob_w_output = log_prob_all_w.gather(dim=2, index=w_index)
+        log_prob_w_output = log_prob_all_w.gather(dim=2, index=w_index)  # 取类别 2 的对数概率（固定 teacher-forcing）
         # 步数预测
         log_prob_all_step = F.log_softmax(diffstep[:, :-1, :], dim=2)  # (B, T-1, 3)
         step_index = torch.ones(log_prob_all_w.shape[:2]).long().unsqueeze(-1).to(diffw.device)
-        log_prob_step_output = log_prob_all_step.gather(dim=2, index=step_index)
+        log_prob_step_output = log_prob_all_step.gather(dim=2, index=step_index) # 取类别 1 的对数概率
 
         return (log_prob_output[:, -num_actions:, 0],
                 log_prob_w_output[:, -num_actions:, 0],
-                log_prob_step_output[:, -num_actions:, 0])  # (B, T)
+                log_prob_step_output[:, -num_actions:, 0])  # (B, 1)
 
     # 批量生成序列及对应的权重和步数预测
     @torch.no_grad()
