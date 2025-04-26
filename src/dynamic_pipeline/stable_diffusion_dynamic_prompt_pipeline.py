@@ -8,162 +8,117 @@ from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import resca
 from special_token import SpecialToken
 
 
-def delete_elements(
-    list_input: List[str], indexes: List[int]
-) -> Tuple[List[str], Dict[int, Optional[int]]]:
-    """
-    Remove elements at specified indexes from a token list.
-
-    Args:
-        list_input: Original list of token strings.
-        indexes: Positions to remove.
-    Returns:
-        new_list: Filtered list with specified positions removed.
-        index_mapping: Mapping from original indexes to new indexes (or None if removed).
-    """
-    keep_set = set(indexes)
-    # Build new list without in-place deletions
-    new_list = [tok for i, tok in enumerate(list_input) if i not in keep_set]
-    # Build mapping from old index -> new index or None
-    index_mapping: Dict[int, Optional[int]] = {}
-    offset = 0
+def delete_elements(list_input, indexes):
+    indexes.sort(reverse=True)
+    index_mapping = {}
     for i in range(len(list_input)):
-        if i in keep_set:
+        if i in indexes:
             index_mapping[i] = None
-            offset += 1
         else:
-            index_mapping[i] = i - offset
-    return new_list, index_mapping
+            index_mapping[i] = i - len([j for j in indexes if j < i])
+
+    for index in indexes:
+        if index < len(list_input):
+            del list_input[index]
+    return list_input, index_mapping
 
 
 class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
-    """
-    Extends StableDiffusionPipeline to support dynamic prompt weights.
 
-    Special syntax in prompt: [text:startFrac-endFrac:weight]
-    will apply 'weight' to 'text' between specified denoising steps.
-    """
-
-    def _extract_special_tokens(
-        self, prompt: str, num_steps: int
-    ) -> List[SpecialToken]:
-        """
-        Scan the raw prompt to extract SpecialToken objects.
-
-        Args:
-            prompt: Raw prompt string containing tags.
-            num_steps: Total denoising steps.
-        Returns:
-            List of SpecialToken instances.
-        """
-        special_tokens: List[SpecialToken] = []
-        clean_acc = ""
-        i = 0
-        while i < len(prompt):
-            if prompt[i] != "[":
-                clean_acc += prompt[i]
-                i += 1
-                continue
-            # Found a '[', parse tag
-            start = i + 1
-            while i < len(prompt) and prompt[i] != "]":
-                i += 1
-            raw = prompt[start:i]
-            parts = raw.split(":")
-            if len(parts) == 3:
-                text, range_raw, weight_raw = parts
-                try:
-                    start_frac, end_frac = map(float, range_raw.split("-"))
-                    start_step = int(start_frac * num_steps)
-                    end_step = int(end_frac * num_steps)
-                    steps = list(range(start_step, end_step + 1))
-                    weight = float(weight_raw)
-                    subtokens = self.tokenizer.tokenize(text)
-                    base_idx = len(self.tokenizer.tokenize(clean_acc))
-                    for j, tok in enumerate(subtokens):
-                        tok_str = self.tokenizer.convert_tokens_to_string(tok)
-                        special_tokens.append(
-                            SpecialToken(tok_str, base_idx + j, steps, weight)
-                        )
-                except Exception:
-                    clean_acc += f"[{raw}]"
+    def parse_single_prompt(self, prompt :str, num_inference_steps :int):
+        prompt = prompt.replace("[ " ," [")
+        # parse single prompt with special format. return clean prompt,special token indexes and their time steps and weights
+        current = ""
+        special_tokens = []
+        ind = 0
+        # 遍历提示词中的每个字符
+        while ind < len(prompt):
+            if prompt[ind] != "[":
+                current += prompt[ind]
+                ind += 1
             else:
-                clean_acc += f"[{raw}]"
-            i += 1
-        return special_tokens
-
-    def _merge_subtokens(
-        self, special_tokens: List[SpecialToken], tokenized: List[str]
-    ) -> List[SpecialToken]:
-        """
-        Optionally merge adjacent subtokens if tokenization splits words.
-
-        Args:
-            special_tokens: Extracted subtokens.
-            tokenized: Full token list of the prompt.
-        Returns:
-            Possibly merged list of SpecialToken.
-        """
-        # For simplicity, assume no merging needed
-        return special_tokens
-
-    def _build_clean_prompts(
-        self,
-        prompt: str,
-        special_tokens: List[SpecialToken],
-        num_steps: int,
-    ) -> Tuple[Dict[int, Tuple[str, List[Tuple[float, int]]]], set]:
-        """
-        Construct per-step clean prompts and weight-index mappings.
-
-        Args:
-            prompt: Original prompt string.
-            special_tokens: Extracted SpecialToken list.
-            num_steps: Total denoising steps.
-        Returns:
-            prompt_map: step -> (clean_prompt, [(weight, index), ...])
-            unique_prompts: set of clean_prompt variations
-        """
-        clean_text = prompt
-        all_toks = self.tokenizer.tokenize(clean_text)
-        prompt_map: Dict[int, Tuple[str, List[Tuple[float, int]]]] = {}
-        unique_prompts = set()
-        for step in range(num_steps):
-            toks = all_toks.copy()
-            active: List[Tuple[float, int]] = []
-            remove_idxs: List[int] = []
-            for sp in special_tokens:
-                if step in sp.steps:
-                    active.append((sp.weight, sp.index_in_all_tokens))
+                # enter special token
+                # step1: tokenize current
+                current_tokens = self.tokenizer.tokenize(current)
+                index_in_all_tokens = len(current_tokens)
+                special_token_str = ""
+                ind += 1
+                while ind <len(prompt) and prompt[ind] != "]":
+                    special_token_str += prompt[ind]
+                    ind += 1
+                if ind >= len(prompt) and prompt[ind - 1] != "]":
+                    ind += len(special_token_str)
+                    current += special_token_str
                 else:
-                    remove_idxs.append(sp.index_in_all_tokens)
-            toks, idx_map = delete_elements(toks, remove_idxs)
-            remapped = [(w, idx_map[i]) for w, i in active if idx_map.get(i) is not None]
-            clean_str = self.tokenizer.convert_tokens_to_string(toks)
-            prompt_map[step] = (clean_str, remapped)
-            unique_prompts.add(clean_str)
-        return prompt_map, unique_prompts
+                    res = special_token_str.split(":")
+                    if len(res) == 3:
+                        text, steps_raw, weight_raw = res
+                        try:
+                            # 解析特殊标记的步骤和权重
+                            endtimestep, starttimestep = map(lambda x: int(float(x) * num_inference_steps),
+                                                             steps_raw.split("-"))
+                            steps = list(range(endtimestep + 1, starttimestep + 1))[::-1]
+                            steps = [num_inference_steps - i for i in steps]
+                            weight = float(weight_raw)
+                            text_tokens = self.tokenizer.tokenize(text)
+                            for sub_ind, sub_token in enumerate(text_tokens):
+                                sub_text = self.tokenizer.convert_tokens_to_string(sub_token)
 
-    def parse_single_prompt(
-        self, prompt: str, num_inference_steps: int
-    ) -> Tuple[Dict[int, Tuple[str, List[Tuple[float, int]]]], set]:
-        """
-        Parse a prompt for dynamic weights across inference steps.
+                                special_tokens.append(
+                                    SpecialToken(sub_text, index_in_all_tokens + sub_ind, steps, weight))
+                            index_in_all_tokens = index_in_all_tokens - 1 + len(text_tokens)
+                            ind += 1
+                            current += text
+                        except:
+                            ind += len(special_token_str)
+                            current += special_token_str
+                    else:
+                        ind += len(special_token_str)
+                        current += special_token_str
+                # 处理可能的标记合并
+                if len(self.tokenizer.tokenize(current)) <= index_in_all_tokens and special_tokens != []:
+                    diff = index_in_all_tokens - len(self.tokenizer.tokenize(current)) + 2
+                    merged_text = ""
+                    merged_weight = special_tokens[-1].weight
+                    merged_steps = special_tokens[-1].steps
+                    merged_index_in_all_tokens = 0
+                    for i in range(diff):
+                        try:
+                            spt = special_tokens.pop()
+                            merged_text = spt.text + merged_text
+                            merged_index_in_all_tokens = spt.index_in_all_tokens
+                        except:
+                            break
+                    special_tokens.append(SpecialToken(merged_text, merged_index_in_all_tokens, merged_steps, merged_weight))
+                    # print(special_tokens)
+        # 生成每个步骤的干净提示词和特殊标记的权重索引对
+        clean_prompt_of_all = current
+        tokens_of_all = self.tokenizer.tokenize(clean_prompt_of_all)
+        clean_prompt_and_specialtoken_weightindex_pair = { }
+        clean_prompt_set = set()
+        for step in range(num_inference_steps):
+            tokens_of_step = [t for t in tokens_of_all]
+            removed_indexes = []
+            sp_list_of_step = []
+            for sp_token in special_tokens:
+                if step not in sp_token.steps:
+                    removed_indexes.append(sp_token.index_in_all_tokens)
+                else:
+                    sp_list_of_step.append((sp_token.weight, sp_token.index_in_all_tokens))
+            removed_indexes.sort(reverse=False)
+            tokens_of_step, index_mapping = delete_elements(tokens_of_step, removed_indexes)
+            sp_list_of_step_copy = sp_list_of_step.copy()
+            # pdb.set_trace()
+            for w, i in sp_list_of_step_copy:
+                try:
+                    sp_list_of_step.append((w, index_mapping[i]))
+                except:
+                    continue
+            clean_prompt_of_step = self.tokenizer.convert_tokens_to_string(tokens_of_step)
+            clean_prompt_and_specialtoken_weightindex_pair[step] = (clean_prompt_of_step, sp_list_of_step)
+            clean_prompt_set.add(clean_prompt_of_step)
 
-        Args:
-            prompt: Prompt string with [text:start-end:weight] syntax.
-            num_inference_steps: Total denoising steps.
-        Returns:
-            A mapping per step to clean prompt and (weight,index) list,
-            plus the set of unique clean prompts.
-        """
-        # Normalize spacing
-        prompt = prompt.replace("[ ", "[")
-        # Extract and preprocess tokens
-        sp_tokens = self._extract_special_tokens(prompt, num_inference_steps)
-        sp_tokens = self._merge_subtokens(sp_tokens, self.tokenizer.tokenize(prompt))
-        # Build clean prompts and mappings
-        return self._build_clean_prompts(prompt, sp_tokens, num_inference_steps)
+        return clean_prompt_and_specialtoken_weightindex_pair, clean_prompt_set
 
     def _encode_prompt(
             self,
