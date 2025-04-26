@@ -81,23 +81,25 @@ class SFTTrainer_head(Trainer):
 
             # 自动混合精度
             with torch.autocast(device_type="cuda", dtype=self.dtype):
-
-                y_hat, diffw, diffstep = opt_model(x)  # (B, 1)
-
-                loss = self.criterion(y_hat, y)  # (B, 1)
-                loss_w = self.criterion(diffw, self.generate_tensor(2, [0, 1, 2, 3, 4], y.shape).long())  # 5分类任务
-                loss_step = self.criterion(diffstep, self.generate_tensor(1, [0, 1, 2], y.shape).long())  # 3分类任务
+                y_hat, diffw, diffstep = opt_model(x) # (B,T,V)
+                loss = self.criterion(y_hat, y)
+                loss_w = self.criterion(diffw, self.generate_tensor(2, [0, 1, 2, 3, 4], y.shape).long())
+                loss_step = self.criterion(diffstep, self.generate_tensor(1, [0, 1, 2], y.shape).long())
                 loss = loss + loss_w + loss_step
 
-            # 梯度裁剪防止爆炸
+            scaler.scale(loss).backward()  # 反向传播，得到scaled梯度 scale缩放解决梯度下溢问题
+
+            scaler.unscale_(self.optimizer)  # 反缩放，把梯度还原成真实大小（非常重要！）
+
             if self.grad_clip != 0.0:
+                # 裁剪真实梯度 防止梯度爆炸
                 torch.nn.utils.clip_grad_norm_(opt_model.parameters(), self.grad_clip)
 
-            # GradScaler梯度缩放、反向传播
-            scaler.scale(loss).backward()
-            scaler.step(self.optimizer)  # 更新模型参数
-            scaler.update()  # 更新梯度缩放器的缩放因子
-            self.optimizer.zero_grad(set_to_none=True)  # 清空优化器梯度
+            scaler.step(self.optimizer)  # 用（裁剪过的）真实梯度更新参数
+
+            scaler.update()  # 更新grad scaler内部状态
+
+            self.optimizer.zero_grad(set_to_none=True)  # 清空梯度
 
             # 训练监控
             lossf = loss.item()

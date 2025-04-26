@@ -58,5 +58,5 @@ class SFT_Datasets(Dataset):
         start = random.randint(0, max(max_start, 0))  # 处理短于 block_size 的情况，避免负数索引，长度不够自动归零
         # 随即切片实现数据增强
         x = self.tokens[start:start + self.block_size]  # 输入序列 x 包含 block_size 个 token
-        y = self.tokens[start + 1:start + self.block_size + 1]  # 目标序列 y 是 x 的右移版本（自回归预测下一个token）
+        y = self.tokens[start + 1:start + self.block_size + 1]  # 目标序列 y 是 x 的右移版本（用于自回归预测下一个token的ground true）
         return x, y  # 形状均为（block_size）

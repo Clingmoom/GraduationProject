@@ -17,3 +17,11 @@ class CrossEntropyLoss(nn.Module):
         return F.cross_entropy(y_hat.view(-1, y_hat.size(-1)),
                                y.view(-1),
                                ignore_index=-1)
+# if __name__ == "__main__":
+#     B = 1
+#     T = 2
+#     vocab_size = 3
+#     y_hats = torch.randn(B*T, vocab_size)
+#     y = [None] * B * T
+#     for y_hat,y in zip(y_hats,y):
+#         模型预测下一个token正确的概率=y_hat[y]
