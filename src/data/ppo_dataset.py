@@ -43,7 +43,7 @@ class PPO_Dataset(Dataset):
 
             self.tokens.append([tokens['input_ids'],
                  tokens['attention_mask'],
-                 torch.sum(tokens['attention_mask'])
+                 torch.sum(tokens['attention_mask']) # 统计非填充token数量（真实token）
             ])
 
     def __len__(self):
