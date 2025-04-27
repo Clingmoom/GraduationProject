@@ -7,7 +7,7 @@ import clip
 from torch import autocast
 from diffusers import UniPCMultistepScheduler
 from transformers import AutoProcessor, AutoModel
-from aesthetic_mlp import AestheticMlp
+from .aesthetic_mlp import AestheticMlp
 from src.dynamic_pipeline import StableDiffusionDynamicPromptPipeline
 
 

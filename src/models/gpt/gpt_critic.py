@@ -3,7 +3,7 @@ import pdb
 
 from torch import Tensor
 from src.configs import TrainingConfig
-from gpt_reward import GPTRewardModel
+from .gpt_reward import GPTRewardModel
 
 
 # 价值模型（长期收益）

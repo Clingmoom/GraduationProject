@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torch.cuda.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from src.configs import TrainingConfig
-from trainer import Trainer
+from .trainer import Trainer
 from src.loss import CrossEntropyLoss
 
 
@@ -54,7 +54,7 @@ class SFTTrainer_head(Trainer):
     def generate_tensor(self, mean, values, shape):
         # 使用正态分布生成随机值，然后将其裁剪到指定范围，并取整
         random_values = np.random.normal(mean, scale=0.5, size=shape)
-        random_values = np.clip(random_values, values.min(), values.max())
+        random_values = np.clip(random_values, min(values), max(values))
         random_values = np.round(random_values)
         tensor = torch.tensor(random_values, device=self.device)
 

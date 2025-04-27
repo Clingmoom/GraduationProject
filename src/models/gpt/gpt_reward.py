@@ -4,7 +4,7 @@ import loralib as lora
 from torch import nn
 from torch import Tensor
 from src.configs import TrainingConfig
-from gpt import GPT
+from .gpt import GPT
 
 
 # 奖励模型（即时反馈）

@@ -4,7 +4,7 @@ from torch import nn
 from torch import Tensor
 from src.configs import TrainingConfig
 from torch.utils.checkpoint import checkpoint
-from transformer_decoder_block import TransformerDecoderBlock
+from .transformer_decoder_block import TransformerDecoderBlock
 
 
 class TransformerDecoder(nn.Module):

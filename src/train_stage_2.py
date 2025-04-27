@@ -5,7 +5,7 @@ from src.data import PPO_Dataset
 from src.trainers import PPOTrainer
 
 
-def train(batch_size, exp_name, actor_weights, critic_weights,epoch,card,num_images_per_prompt):
+def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_images_per_prompt):
     cfg = get_configs("gpt2-medium")
     device = f"cuda:{card}"
 
@@ -30,8 +30,8 @@ def train(batch_size, exp_name, actor_weights, critic_weights,epoch,card,num_ima
 
     critic.freeze_weights("lora")
 
-    dataset = PPO_Dataset(device=device)
-    trainer = PPOTrainer(cfg, actor, critic, sft_model, dataset, num_images_per_prompt=num_images_per_prompt, device=device)
+    dataset = PPO_Dataset(device = device)
+    trainer = PPOTrainer(cfg, actor, critic, sft_model, dataset, num_images_per_prompt = num_images_per_prompt, device = device)
     trainer.fit()
 
 
@@ -45,8 +45,8 @@ def train(batch_size, exp_name, actor_weights, critic_weights,epoch,card,num_ima
 @click.option('--num_images_per_prompt', '-num_images_per_prompt', default=2)
 
 
-def main( batch_size, exp_name, actor, critic,epoch,card,num_images_per_prompt):
-    train(batch_size, exp_name, actor, critic,epoch,card,num_images_per_prompt)
+def main( batch_size, exp_name, actor, critic, epoch, card, num_images_per_prompt):
+    train(batch_size, exp_name, actor, critic, epoch, card, num_images_per_prompt)
 
 
 if __name__ == "__main__":

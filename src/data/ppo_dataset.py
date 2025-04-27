@@ -4,6 +4,7 @@ import numpy as np
 
 from torch.utils.data import Dataset
 from transformers import GPT2Tokenizer
+from src.configs import ROOT_DIR
 
 
 class PPO_Dataset(Dataset):
@@ -24,7 +25,7 @@ class PPO_Dataset(Dataset):
                  else c for c in text]
             )
 
-        prompt_list = np.load("train_data.npy")
+        prompt_list = np.load(ROOT_DIR / "data" / "training_data" / "train_data.npy")
         for prompt in prompt_list:
             response_text = prompt.lower() if prompt.isupper() else (prompt.capitalize() if random.random() < 0.5 else prompt)
 

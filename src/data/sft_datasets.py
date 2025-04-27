@@ -4,6 +4,7 @@ import torch
 
 from torch.utils.data import Dataset
 from transformers import GPT2Tokenizer
+from src.configs import ROOT_DIR
 
 
 # 实际可用样本数量 ≈ (总tokens数 - block_size) * 数据增强次数（通过随机切片实现）
@@ -26,7 +27,7 @@ class SFT_Datasets(Dataset):
 
         all_tokens = []
 
-        prompt_list = np.load("train_data.npy")
+        prompt_list = np.load(ROOT_DIR / "data" / "training_data" / "train_data.npy")
         for prompt in prompt_list:
 
             if random.random() < 0.5: # 随机选择首字母 进行大小写替换 isupper() 判断字符串所有字母是否全部大写
@@ -60,3 +61,10 @@ class SFT_Datasets(Dataset):
         x = self.tokens[start:start + self.block_size]  # 输入序列 x 包含 block_size 个 token
         y = self.tokens[start + 1:start + self.block_size + 1]  # 目标序列 y 是 x 的右移版本（用于自回归预测下一个token的ground true）
         return x, y  # 形状均为（block_size）
+
+
+def test():
+    print(np.load(ROOT_DIR / "src"/"data" / "train_data.npy"))
+
+if __name__ == "__main__":
+    test()

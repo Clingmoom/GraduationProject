@@ -1,5 +1,7 @@
+import pathlib
 from dataclasses import dataclass, asdict
 
+ROOT_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
 @dataclass
 class TrainingConfig:
@@ -129,15 +131,17 @@ def get_configs(name) -> TrainingConfig:
             hf_model="gpt2-xl",
         )
     elif name == "gpt2-xl/dropout":
-        return TrainingConfig(n_layers=48,
-                              n_heads=25,
-                              embedding_dim=1600,
-                              dropout_rate=0.2,
-                              use_bias=True,
-                              block_size=1024,
-                              vocab_size=50257,
-                              model_name="gpt2-xl/dropout",
-                              hf_model="gpt2-xl")
+        return TrainingConfig(
+            n_layers=48,
+            n_heads=25,
+            embedding_dim=1600,
+            dropout_rate=0.2,
+            use_bias=True,
+            block_size=1024,
+            vocab_size=50257,
+            model_name="gpt2-xl/dropout",
+            hf_model="gpt2-xl"
+        )
     elif name == "gpt2-xl/lora":
         return TrainingConfig(
             n_layers=48,
