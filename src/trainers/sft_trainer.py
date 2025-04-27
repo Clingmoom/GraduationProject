@@ -8,7 +8,7 @@ from torch.cuda.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from src.configs import TrainingConfig
-from trainer import Trainer
+from .trainer import Trainer
 from src.loss import CrossEntropyLoss
 
 

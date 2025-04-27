@@ -5,7 +5,7 @@ from diffusers.loaders import LoraLoaderMixin,TextualInversionLoaderMixin
 from typing import *
 from diffusers.pipelines.stable_diffusion.pipeline_output import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import rescale_noise_cfg
-from special_token import SpecialToken
+from .special_token import SpecialToken
 
 
 def delete_elements(list_input, indexes):

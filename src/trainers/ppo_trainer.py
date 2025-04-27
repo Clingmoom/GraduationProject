@@ -11,12 +11,12 @@ from transformers import GPT2Tokenizer
 from torch.cuda.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
-from trainer import Trainer
-from experience import Experience
+from .trainer import Trainer
+from .experience import Experience
 from src.configs import TrainingConfig
 from src.models import GPTActor, GPTCritic
 from src.loss import ValueLoss, PolicyLoss
-from prompt_scorer import PromptScorer
+from .prompt_scorer import PromptScorer
 
 
 class PPOTrainer(Trainer):
@@ -88,13 +88,13 @@ class PPOTrainer(Trainer):
         self.actor_optimizer = optim.Adam(
             self.actor.parameters(),
             lr=cfg.actor_lr,
-            betas=(self.cfg.adam_beta1, self.cfg.adam_beta1),
+            betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
         )
 
         self.critic_optimizer = optim.Adam(
             self.critic.parameters(),
             lr=cfg.critic_lr,
-            betas=(self.cfg.adam_beta1, self.cfg.adam_beta1),
+            betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
         )
 
         self.step=0
@@ -120,22 +120,34 @@ class PPOTrainer(Trainer):
         print("Initialized PPO Trainer")
 
     def kl_penalized_reward(
-        self,
-        reward: torch.Tensor,
-        log_prob_rl: torch.Tensor,
-        log_prob_sft: torch.Tensor,
-        action_mask: torch.Tensor = None,
+            self,
+            reward: torch.Tensor,
+            log_prob_rl: torch.Tensor,
+            log_prob_sft: torch.Tensor,
+            action_mask: torch.Tensor = None,
     ) -> Tuple[Tensor, Tensor]:
-        # log(π_RL(y|x) / π_SFL(y|x)) = log(π_RL(y|x)) - log(π_SFL(y|x))
+        '''
+        计算 KL 惩罚后的奖励。
+        Args:
+            reward: (B, 1) 初始环境奖励
+            log_prob_rl: (B, T) 当前策略生成动作的log概率
+            log_prob_sft: (B, T) 参考策略生成动作的log概率
+            action_mask: (B, T) 是否是有效动作的位置掩码
+        Returns:
+            penalized_reward: (B, 1) 加了KL惩罚后的奖励
+            estimated_kl: (B, 1) 平均KL散度
+        '''
+        # log(π_RL(y|x) / π_SFT(y|x)) = log(π_RL(y|x)) - log(π_SFT(y|x))
         ratio = log_prob_rl - log_prob_sft
-        # k3 in http://joschu.net/blog/kl-approx.html
-        estimated_kl = (torch.exp(ratio) - 1) - ratio # 二阶近似计算
-        if action_mask:
-            estimated_kl = estimated_kl * action_mask
-            estimated_kl.sum(dim=1) / action_mask.sum(dim=1)
-        estimated_kl = estimated_kl.mean(
-            dim=1, keepdim=True)  # estimated_kl -> (B, 1)
-        return reward - self.cfg.kl_beta * estimated_kl, estimated_kl
+        estimated_kl = (torch.exp(ratio) - 1) - ratio  # 二阶近似
+        if action_mask is not None:
+            estimated_kl = (estimated_kl * action_mask).sum(dim=1) / action_mask.sum(dim=1)
+        else:
+            estimated_kl = estimated_kl.mean(dim=1)
+        estimated_kl = estimated_kl.unsqueeze(-1)  # 保持输出shape (B, 1)
+
+        penalized_reward = reward - self.cfg.kl_beta * estimated_kl
+        return penalized_reward, estimated_kl
 
     @torch.no_grad()
     def make_experience(self, idx, input_masks, input_lengths):

@@ -6,6 +6,9 @@ from src.models import GPTActor
 from src.data import SFT_Datasets
 from src.configs import get_configs
 
+# 内存碎片优化
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 tic=time.time()
 def train(batch_size, exp_name, step, card):

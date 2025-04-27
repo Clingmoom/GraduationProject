@@ -1,7 +1,7 @@
 import torch
 import loralib as lora
 
-from decoder import TransformerDecoder
+from .decoder import TransformerDecoder
 from torch import nn
 from torch import Tensor
 from torch.nn import functional as F

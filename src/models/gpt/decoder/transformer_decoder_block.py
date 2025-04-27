@@ -1,8 +1,8 @@
 from torch import nn
 from torch import Tensor
 from src.configs import TrainingConfig
-from masked_multihead_self_attention import MaskedMultiheadSelfAttention
-from feed_forward_networks import FeedForwardNetworks
+from .masked_multihead_self_attention import MaskedMultiheadSelfAttention
+from .feed_forward_networks import FeedForwardNetworks
 
 
 class TransformerDecoderBlock(nn.Module):
