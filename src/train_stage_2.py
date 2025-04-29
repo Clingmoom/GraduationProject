@@ -36,13 +36,13 @@ def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_
 
 
 @click.command()
-@click.option('--batch-size', '-b', default=2)
-@click.option('--exp-name', '-n', default="default")
-@click.option('--actor', '-a',default="./runs/stage1_step.pt")
-@click.option('--critic', '-c',default="./runs/stage1_step.pt")
-@click.option('--epoch', '-e', default=1)
-@click.option('--card', '-card', default="0")
-@click.option('--num_images_per_prompt', '-num_images_per_prompt', default=2)
+@click.option('--batch-size', '-b', default = 2)
+@click.option('--exp-name', '-n', default = "default")
+@click.option('--actor', '-a', default = "./runs/stage1_step.pt")
+@click.option('--critic', '-c', default = "./runs/stage1_step.pt")
+@click.option('--epoch', '-e', default = 1)
+@click.option('--card', '-card', default = "0")
+@click.option('--num_images_per_prompt', '-num_images_per_prompt', default = 2)
 
 
 def main( batch_size, exp_name, actor, critic, epoch, card, num_images_per_prompt):

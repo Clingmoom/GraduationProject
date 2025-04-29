@@ -52,3 +52,4 @@ class PPO_Dataset(Dataset):
 
     def __getitem__(self, idx):
         return self.tokens[idx][0], self.tokens[idx][1], self.tokens[idx][2]
+        # (prompt, mask, input_length)

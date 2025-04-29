@@ -95,7 +95,7 @@ class SFTTrainer_head(Trainer):
                 # 裁剪真实梯度 防止梯度爆炸
                 torch.nn.utils.clip_grad_norm_(opt_model.parameters(), self.grad_clip)
 
-            scaler.step(self.optimizer)  # 用（裁剪过的）真实梯度更新参数
+            scaler.step(self.optimizer)  # 用（裁剪过的）真实梯度更新参数  调用 optimizer.step()
 
             scaler.update()  # 更新grad scaler内部状态
 

@@ -46,7 +46,7 @@ class PPOTrainer(Trainer):
         self.critic = cast(GPTCritic, torch.compile(self.orig_critic)) # 评价网络
         self.sft_model = cast(GPTActor, torch.compile(self.orig_sft_model)) # 参考网络
 
-        # 初始化评分器
+        # 初始化评分器 （基于StableDiffusion生成图片后的PickScore+CLIP+Aesthetic）
         self.scorer =PromptScorer(device=device,num_images_per_prompt=num_images_per_prompt)
 
         # Separate actor loss from critic loss to save optimizer memory
@@ -155,15 +155,18 @@ class PPOTrainer(Trainer):
         self.sft_model.eval()
         self.actor.eval()
         self.critic.eval()
-        (   completion,
-            attention_mask,
-            num_actions,
-            action_mask, diffw_list, diffstep_list
+        (   completion,     # 完整扩展token序列 （B，T）
+            attention_mask, # 标记哪些位置是有效token
+            num_actions,    # 新生成动作的数量
+            action_mask,    # 标记哪些是actor新生成的动作
+            diffw_list,
+            diffstep_list
         ) = self.actor.batch_generate(
             idx,
             input_masks,
             input_lengths,
             self.max_new_tokens,
+            # 采样方式
             temperature=1.0,
             top_k=50,
         )
@@ -177,22 +180,26 @@ class PPOTrainer(Trainer):
             print("idx", idx.shape)
             print("input_masks", input_masks.shape)
 
+        #计算生成文本的动作log概率
         actor_log_probs, w_log_probs, step_log_probs = self.actor.forward_actor(
             completion, attention_mask, num_actions  # (B, num_actions)
         )
+        # 参考模型（来自train_stage_1）预测动作log概率（用于KL对比）
         sft_log_probs, sft_w_log_probs, sft_step_log_probs = self.sft_model.forward_actor(
             completion, attention_mask, num_actions
         )  # (B, num_actions)
-
+        # 估算每个 completion 的价值
         values = self.critic.forward_critic(completion, attention_mask, num_actions).view(-1, 1)  # (B, 1)
 
+        # 构造原始提示的文本
         input_prompt = [self.tokenizer.decode(completion[i,:input_lengths[i]]) for i in range(completion.size(0))]
         output_prompt=[]
-        target = [torch.tensor(220,device = completion.device), torch.tensor(50256, device = completion.device)]
+        target = [torch.tensor(220,device = completion.device),
+                  torch.tensor(50256, device = completion.device)]
         target_value = torch.tensor(50256, device = completion.device)
+
         for i in range(completion.size(0)):
             res = completion[i, input_lengths[i]:]
-
             input_w = diffw_list[i, input_lengths[i]:]
             input_step = diffstep_list[i, input_lengths[i]:]
             indices = [i for i, sublist in enumerate(zip(res, res[1:])) if list(sublist) == target]
@@ -235,6 +242,11 @@ class PPOTrainer(Trainer):
         advantage = kl_penalized_reward - values
         w_advantage = w_kl_penalized_reward - values
         step_advantage = step_kl_penalized_reward - values
+
+        # advantage normalization ~ 标准化
+        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
+        w_advantage = (w_advantage - w_advantage.mean()) / (w_advantage.std() + 1e-8)
+        step_advantage = (step_advantage - step_advantage.mean()) / (step_advantage.std() + 1e-8)
 
         if self.debug:
             print("kl_penalized_reward", kl_penalized_reward)
@@ -385,6 +397,7 @@ class PPOTrainer(Trainer):
                     self.critic_optimizer.zero_grad(set_to_none = True)
                     critic_lossf = critic_loss.item()
                     scaler.update()
+
                 # 日志与检查点
                 self.writer.add_scalar("KL", experience.estimated_kl.mean(), total_steps)
                 self.writer.add_scalar("mean_advantage", experience.advantage.mean(), total_steps)
