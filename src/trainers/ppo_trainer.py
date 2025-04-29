@@ -46,7 +46,7 @@ class PPOTrainer(Trainer):
         self.critic = cast(GPTCritic, torch.compile(self.orig_critic)) # 评价网络
         self.sft_model = cast(GPTActor, torch.compile(self.orig_sft_model)) # 参考网络
 
-        # 初始化评分器
+        # 初始化评分器 （基于StableDiffusion生成图片后的PickScore+CLIP+Aesthetic）
         self.scorer =PromptScorer(device=device,num_images_per_prompt=num_images_per_prompt)
 
         # Separate actor loss from critic loss to save optimizer memory
@@ -236,6 +236,11 @@ class PPOTrainer(Trainer):
         w_advantage = w_kl_penalized_reward - values
         step_advantage = step_kl_penalized_reward - values
 
+        # advantage normalization ~ 标准化
+        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
+        w_advantage = (w_advantage - w_advantage.mean()) / (w_advantage.std() + 1e-8)
+        step_advantage = (step_advantage - step_advantage.mean()) / (step_advantage.std() + 1e-8)
+
         if self.debug:
             print("kl_penalized_reward", kl_penalized_reward)
             print("advantage", advantage.shape) #[B, 1]
@@ -385,6 +390,7 @@ class PPOTrainer(Trainer):
                     self.critic_optimizer.zero_grad(set_to_none = True)
                     critic_lossf = critic_loss.item()
                     scaler.update()
+
                 # 日志与检查点
                 self.writer.add_scalar("KL", experience.estimated_kl.mean(), total_steps)
                 self.writer.add_scalar("mean_advantage", experience.advantage.mean(), total_steps)
