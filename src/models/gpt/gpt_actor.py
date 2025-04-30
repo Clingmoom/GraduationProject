@@ -101,34 +101,41 @@ class GPTActor(nn.Module):
         min_input_length = torch.min(input_lengths)  # (B)
         max_input_length = torch.max(input_lengths)  # (B)
 
-        total_length = min(max_input_length + random.randint(15, 77), 154)
+        total_length = min(max_input_length + random.randint(15, max_new_tokens), 154)
 
         if T < total_length:
+            # 用pad填充 idx 和 input_masks 至长度为 total_length 50256对应 eos_token
             idx = F.pad(idx, (0, total_length - T), value=int(50256))
             input_masks = F.pad(input_masks, (0, total_length - T), value=0.0)
         input_masks = input_masks.bool()
 
-        diffw_list = torch.ones_like(idx) * 2
-        diffstep_list = torch.ones_like(idx)
+        diffw_list = torch.ones_like(idx) * 2 # 初始值：2
+        diffstep_list = torch.ones_like(idx)  # 初始值：1
+        # TODO明天先看这个 priority：MAX
         for curr_pos in range(min_input_length, total_length):
-            # forward the model to get the logits for the index in the sequence
-
-            logits, diffw, diffstep = self(idx[:, :curr_pos])  # B, T, D
+            # forward the model to get the logits, diffw and diffstep for the index in the sequence
+            # 在每个位置 模型前向传播
+            logits, diffw, diffstep = self(idx[:, :curr_pos])  # B, T, vocab_size   B, T, 5   B, T, 3
 
             # pluck the logits at the final step and scale by desired temperature
+            # 最后一步 进行温度缩放
             logits = logits[:, -1, :] / temperature
             diffw = diffw[:, -1, :] / temperature
             diffstep = diffstep[:, -1, :] / temperature
+
             # optionally crop the logits to only the top k options
             if top_k is not None:
+                # torch.topk 返回 按降序排列的最大值及其索引
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                # v[:, [-1]]:v每一行的最后一个元素
+                # -float('Inf'):设置为负无穷大
                 logits[logits < v[:, [-1]]] = -float('Inf')
-                # apply softmax to convert logits to (normalized) probabilities
+
+            # apply softmax to convert logits to (normalized) probabilities
             probs = F.softmax(logits, dim=-1)
             # sample from the distribution
-            next_id = torch.multinomial(probs, num_samples=1).view(-1)
-            next_id = torch.where(input_masks[:, curr_pos], idx[:, curr_pos],
-                                  next_id)  #
+            next_id = torch.multinomial(probs, num_samples=1).view(-1) # 从概率分布中抽取 num_samples 个样本
+            next_id = torch.where(input_masks[:, curr_pos], idx[:, curr_pos], next_id) # torch.where(condition, x, y) 三元操作符 condition 为 True，则选择 x，否则选择 y
             # append sampled index to the running sequence and continue
             idx[:, curr_pos] = next_id
 

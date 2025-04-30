@@ -26,6 +26,7 @@ class PPO_Dataset(Dataset):
             )
 
         prompt_list = np.load(ROOT_DIR / "data" / "training_data" / "train_data.npy")
+        # TODO:考虑优化 先预处理再一起给tokenizer
         for prompt in prompt_list:
             response_text = prompt.lower() if prompt.isupper() else (prompt.capitalize() if random.random() < 0.5 else prompt)
 

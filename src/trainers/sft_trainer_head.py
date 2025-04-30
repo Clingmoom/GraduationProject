@@ -68,7 +68,7 @@ class SFTTrainer_head(Trainer):
         opt_model.to(self.device)
         # 记录训练日志
         writer = SummaryWriter(f"./runs/{self.run_name}/logs", max_queue=40)
-        scaler = GradScaler(enabled=self.dtype != torch.float32)  # 混合精度训练
+        scaler = GradScaler(enabled = self.dtype != torch.float32)  # 混合精度训练
 
         opt_model.train()  # 训练模式
         step = 0

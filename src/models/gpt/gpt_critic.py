@@ -12,13 +12,13 @@ class GPTCritic(GPTRewardModel):
     def forward_critic(self,
                        x: Tensor,
                        attention_mask: Tensor = None,
-                       num_actions=0) -> torch.Tensor:
+                       num_actions = 0) -> torch.Tensor:
         '''
         计算输入序列的长期收益。
         Args:
-            x: 输入序列，形状为 (B, T)，其中 B 是批次大小，T 是序列长度。
-            attention_mask: 注意力掩码，形状为 (B, T)，用于指示序列中哪些位置是有效的。默认为 None。
-            num_actions: 要忽略的动作数量。默认为 0。
+            x: shape (B, T)，其中 B 是批次大小，T 是序列长度。
+            attention_mask: shape (B, T)，用于指示序列中哪些位置是有效的。默认 None。
+            num_actions: 新生成动作数量。默认 0。
         Returns:
             Tensor: 长期收益，形状为 (B, 1)
         '''
@@ -27,7 +27,7 @@ class GPTCritic(GPTRewardModel):
         values = self.value_head(hidden).squeeze(-1)  # (B, T, 1)
         # Vt only depends on st
         values = values * attention_mask
-        values = values[:, :-num_actions].mean(dim=1)
+        values = values[:, :-num_actions].mean(dim=1) # 只要原始 prompt 部分
         if torch.isnan(values).any().item():
             print("values nan:" ,values.shape ,values)
             pdb.set_trace()
