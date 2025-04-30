@@ -101,17 +101,17 @@ class GPTActor(nn.Module):
         min_input_length = torch.min(input_lengths)  # (B)
         max_input_length = torch.max(input_lengths)  # (B)
 
-        total_length = min(max_input_length + random.randint(15, 77), 154)
+        total_length = min(max_input_length + random.randint(15, max_new_tokens), 154)
 
         if T < total_length:
-            # 用pad填充 idx 和 input_masks 至长度为 total_length
+            # 用pad填充 idx 和 input_masks 至长度为 total_length 50256对应 eos_token
             idx = F.pad(idx, (0, total_length - T), value=int(50256))
             input_masks = F.pad(input_masks, (0, total_length - T), value=0.0)
         input_masks = input_masks.bool()
 
         diffw_list = torch.ones_like(idx) * 2 # 初始值：2
         diffstep_list = torch.ones_like(idx)  # 初始值：1
-
+        # TODO明天先看这个 priority：MAX
         for curr_pos in range(min_input_length, total_length):
             # forward the model to get the logits, diffw and diffstep for the index in the sequence
             # 在每个位置 模型前向传播

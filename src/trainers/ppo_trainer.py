@@ -202,19 +202,20 @@ class PPOTrainer(Trainer):
             res = completion[i, input_lengths[i]:]
             input_w = diffw_list[i, input_lengths[i]:]
             input_step = diffstep_list[i, input_lengths[i]:]
+            # 裁剪新生成的动作 直到end前
             indices = [i for i, sublist in enumerate(zip(res, res[1:])) if list(sublist) == target]
             if len(indices) > 0:
                 end = int(indices[0])
                 res = res[:end]
                 input_w = input_w[:end]
                 input_step = input_step[:end]
-
             if target_value in res:
                 end = res.cpu().numpy().tolist().index(target_value)
                 res = res[:end]
                 input_w = input_w[:end]
                 input_step = input_step[:end]
 
+            # 把新生成的 token（res）+ 对应的 diffw 和 diffstep
             output_tokens = self.trans_token(res, input_w, input_step)
             res = self.tokenizer.decode( torch.cat([completion[i, :input_lengths[i]], output_tokens]) )
 
@@ -321,11 +322,12 @@ class PPOTrainer(Trainer):
                     input_masks.to(self.device),
                     input_lengths.to(self.device),
                 )
+
                 if self.debug:
                     print("prompt", prompt.shape)
 
-                max_input_length = torch.max(input_lengths)
-                prompt = prompt[:, :max_input_length] # 截断到实际长度
+                real_input_length = torch.max(input_lengths)
+                prompt = prompt[:, :real_input_length] # 截断到实际长度
 
                 if self.debug:
                     print("input_lengths", input_lengths)
