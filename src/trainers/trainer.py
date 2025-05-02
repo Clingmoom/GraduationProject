@@ -3,6 +3,8 @@ import json
 import torch
 import random
 
+from src.configs import ROOT_DIR
+
 
 class Trainer:
     def __init__(self) -> None:
@@ -25,12 +27,14 @@ class Trainer:
             json.dump(metrics, fp, indent=4)
 
     def save_states(self, step, is_last=False):
-        if not os.path.exists(f"./runs/{self.run_name}"):
-            os.makedirs(f"./runs/{self.run_name}")
+        save_dir = ROOT_DIR / "ckpt" / "test" / f"{self.run_name}"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
         # 根据是否为最后一步确定保存的文件名
         file_name = (
             "final.pt" if is_last else f"step{step}.pt"
         )
+        save_path = save_dir / file_name
         # 保存模型的当前步数、模型状态字典和优化器状态字典
         torch.save(
             {
@@ -38,5 +42,5 @@ class Trainer:
                 "model_state_dict": self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
             },
-            f"./runs/{self.run_name}/{file_name}",
+            save_path,
         )

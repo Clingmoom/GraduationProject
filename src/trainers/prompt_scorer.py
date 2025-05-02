@@ -9,6 +9,7 @@ from diffusers import UniPCMultistepScheduler
 from transformers import AutoProcessor, AutoModel
 from .aesthetic_mlp import AestheticMlp
 from src.dynamic_pipeline import StableDiffusionDynamicPromptPipeline
+from ..configs import ROOT_DIR
 
 
 class PromptScorer:
@@ -33,12 +34,11 @@ class PromptScorer:
 
     def init_clip_model(self):
         # wget https://openaipublic.azureedge.net/clip/models/b8cca3fd41ae0c99ba7e8951adf17d267cdb84cd88be6f7c2e0eca1737a03836/ViT-L-14.pt
-        self.clip_model, self.clip_preprocess = clip.load("ckpt/CLIP_ViT/ViT-L-14.pt", device=self.device, jit=False)
+        self.clip_model, self.clip_preprocess = clip.load(ROOT_DIR / "ckpt" / "CLIP_ViT" / "ViT-L-14.pt", device=self.device, jit=False)
 
     def init_aesthetic_model(self):
         model = AestheticMlp(768)
-        s = torch.load("ckpt/aesthetic/sac+logos+ava1-l14-linearMSE.pth")
-
+        s = torch.load(ROOT_DIR / "ckpt" / "aesthetic" / "sac+logos+ava1-l14-linearMSE.pth")
         model.load_state_dict(s)
         model.to(self.device)
         model.eval()
@@ -54,7 +54,7 @@ class PromptScorer:
 
         pipe = StableDiffusionDynamicPromptPipeline.from_pretrained(
             self.sdmodel_name,
-            revision="fp16",
+            # revision="fp16",
             torch_dtype=torch.float16,
             scheduler=dpm_scheduler,
         )
