@@ -40,11 +40,12 @@ class PPOTrainer(Trainer):
 
         self.orig_actor = actor
         self.orig_critic = critic
-        self.orig_sft_model = sft_model
+        #self.orig_sft_model = sft_model
+        self.sft_model = sft_model
 
         self.actor = cast(GPTActor, torch.compile(self.orig_actor)) # 策略网络（生成文本）
         self.critic = cast(GPTCritic, torch.compile(self.orig_critic)) # 评价网络
-        self.sft_model = cast(GPTActor, torch.compile(self.orig_sft_model)) # 参考网络
+        #self.sft_model = cast(GPTActor, torch.compile(self.orig_sft_model)) # 参考网络
 
         # 初始化评分器 （基于StableDiffusion生成图片后的PickScore+CLIP+Aesthetic）
         self.scorer =PromptScorer(device=device,num_images_per_prompt=num_images_per_prompt)

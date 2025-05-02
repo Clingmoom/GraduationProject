@@ -23,7 +23,7 @@ class PromptScorer:
         self.device = device
         self.init_clip_model()
         self.init_aesthetic_model()
-        self.init_diffusion_model()
+        self.diffusion_pipe = None  # 延迟初始化
         self.init_pickscore_model()
 
         self.eval_data_res = []
@@ -198,6 +198,9 @@ class PromptScorer:
         return images
 
     def get_score_batched(self, prompts, plain_texts, plain_aes_score=None):
+        if self.diffusion_pipe is None:
+            self.init_diffusion_model()  # 延迟加载（仅第一次）
+
         images = self.gen_image_batched(prompts)
         image_features = self.get_clip_features(images, is_batched=True)
 
