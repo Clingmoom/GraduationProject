@@ -246,7 +246,7 @@ class GPTActor(nn.Module):
         model.load_state_dict(checkpoint["model_state_dict"], strict=True)
         return model
 
-    # 从预训练模型加载权重
+    # 从 Hagging Face GPT2HeadModel 加载权重到自定义的GPTActor中
     @classmethod
     def from_pretrained(cls, cfg: TrainingConfig):
         """
@@ -283,8 +283,8 @@ class GPTActor(nn.Module):
                     return True
             return False
 
+        # 初始化自定义的GPTActor模型 获取状态字典  过滤不需要的键
         model = GPTActor(cfg)
-
         model_states = model.state_dict()
 
         model_states_keys = [
@@ -292,8 +292,8 @@ class GPTActor(nn.Module):
         ]
         model_states_keys = [k for k in model_states_keys if not 'lora' in k]
 
+        # 加载 预训练模型 获取预训练模型 状态字典  过滤不需要的键
         model_pretrained = GPT2LMHeadModel.from_pretrained("gpt2-medium")
-
         pretrained_states = model_pretrained.state_dict()
 
         pretrained_states_keys = [
@@ -303,18 +303,19 @@ class GPTActor(nn.Module):
             k for k in pretrained_states_keys if not k.endswith('.attn.bias')
         ]
 
+        # 权重复制
         for dst_key in model_states_keys:
             if "predict_weight_token" in dst_key or "predict_diffstep_token" in dst_key:
                 continue
             src_key = convert_state_key(dst_key)
             if should_transpose(src_key):
-                assert pretrained_states[src_key].shape[::-1] == model_states[
-                    dst_key].shape
+                # assert 断言 如果不相同，程序会抛出AssertionError异常并终止
+                # [::-1] 翻转形状元组 后.t()转置并复制
+                assert pretrained_states[src_key].shape[::-1] == model_states[dst_key].shape
                 with torch.no_grad():
                     model_states[dst_key].copy_(pretrained_states[src_key].t())
             else:
-                assert pretrained_states[src_key].shape == model_states[
-                    dst_key].shape
+                assert pretrained_states[src_key].shape == model_states[dst_key].shape
                 with torch.no_grad():
                     model_states[dst_key].copy_(pretrained_states[src_key])
 
