@@ -9,13 +9,13 @@ from src.configs import ROOT_DIR
 
 # 实际可用样本数量 ≈ (总tokens数 - block_size) * 数据增强次数（通过随机切片实现）
 class SFT_Datasets(Dataset):
-    def __init__(self, device = "cuda", block_size = 77)->None:
+    def __init__(self, device, block_size = 77)->None:
         super().__init__()
         print("Load SFT Datasets.")
         self.device = device
         self.block_size = block_size
 
-        tokenizer = GPT2Tokenizer.from_pretrained("gpt2",device=device)
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         tokenizer.pad_token = tokenizer.eos_token # 填充符
 
         def replace_period_with_comma(text):
