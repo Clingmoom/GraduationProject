@@ -15,7 +15,7 @@ from src.loss import CrossEntropyLoss
 
 class SFTTrainer_head(Trainer):
     def __init__(
-            self, cfg: TrainingConfig, device, model: nn.Module, train_dataset
+        self, cfg: TrainingConfig, device, model: nn.Module, train_dataset
     ) -> None:
         super().__init__()
         self.cfg = cfg
