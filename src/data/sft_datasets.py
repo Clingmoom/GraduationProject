@@ -9,7 +9,7 @@ from src.configs import ROOT_DIR
 
 # 实际可用样本数量 ≈ (总tokens数 - block_size) * 数据增强次数（通过随机切片实现）
 class SFT_Datasets(Dataset):
-    def __init__(self, device, block_size = 77)->None:
+    def __init__(self, device, block_size)->None:
         super().__init__()
         print("Load SFT Datasets.")
         self.device = device
@@ -29,16 +29,16 @@ class SFT_Datasets(Dataset):
 
         prompt_list = np.load(ROOT_DIR / "data" / "training_data" / "train_data.npy")
         for prompt in prompt_list:
-
-            if random.random() < 0.5: # 随机选择首字母 进行大小写替换 isupper() 判断字符串所有字母是否全部大写
-                first_term=prompt
-                if first_term.isupper():
+            # 随机选择首字母 进行大小写替换 isupper()
+            if random.random() < 0.5: 
+                first_term = prompt
+                if first_term.isupper(): # 判断字符串所有字母是否全部大写
                     first_term = first_term.lower()
                 else:
                     first_term = first_term.capitalize() # 首字母大写 其余小写
-                response_text=first_term
+                response_text = first_term
             else:
-                response_text=prompt
+                response_text = prompt
 
             processed_text = replace_period_with_comma(response_text)
             suffix = "" if "<|endoftext|>" in processed_text else "<|endoftext|>"
@@ -64,7 +64,7 @@ class SFT_Datasets(Dataset):
 
 
 def test():
-    print(np.load(ROOT_DIR / "src"/"data" / "train_data.npy"))
+    print(np.load(ROOT_DIR / "data" / "training_data" / "train_data.npy"))
 
 if __name__ == "__main__":
     test()
