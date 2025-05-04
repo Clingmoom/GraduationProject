@@ -8,7 +8,9 @@ from src.configs import ROOT_DIR
 
 
 class PPO_Dataset(Dataset):
-    def __init__(self, device="cuda", block_size=77) -> None:
+    def __init__(self, device="cuda", block_size: int=77) -> None:
+        if not (isinstance(block_size, int) or 0< block_size <=77):
+            raise ValueError("block_size must be a positive integer and less than or equal to 77.")
         super().__init__()
         print("Load PPO Dataset.")
         self.device = device

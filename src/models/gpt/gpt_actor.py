@@ -129,7 +129,8 @@ class GPTActor(nn.Module):
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
                 # v[:, [-1]]:v每一行的最后一个元素
                 # -float('Inf'):设置为负无穷大
-                logits[logits < v[:, [-1]]] = -float('Inf')
+                # logits[logits < v[:, [-1]]] = -float('Inf')
+                logits[logits < v[:, -1:]] = -float('Inf')
 
             # apply softmax to convert logits to (normalized) probabilities
             probs = F.softmax(logits, dim=-1)
