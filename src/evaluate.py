@@ -72,12 +72,12 @@ step_dict = {
     2: torch.tensor(tokenizer.encode("0.5-1"),device=device),#0.5-1
 }
 w_dict = {
-            0: torch.tensor(tokenizer.encode("0.5"),device=device),
-            1: torch.tensor(tokenizer.encode("0.75"),device=device),
-            2: torch.tensor(tokenizer.encode("1.0"),device=device),
-            3: torch.tensor(tokenizer.encode("1.25"),device=device),
-            4: torch.tensor(tokenizer.encode("1.5"),device=device),
-        }
+    0: torch.tensor(tokenizer.encode("0.5"),device=device),
+    1: torch.tensor(tokenizer.encode("0.75"),device=device),
+    2: torch.tensor(tokenizer.encode("1.0"),device=device),
+    3: torch.tensor(tokenizer.encode("1.25"),device=device),
+    4: torch.tensor(tokenizer.encode("1.5"),device=device),
+}
 token_dict = {
     ",": torch.tensor(tokenizer.encode(",")[0],device=device),
     ".": torch.tensor(tokenizer.encode(".")[0],device=device),

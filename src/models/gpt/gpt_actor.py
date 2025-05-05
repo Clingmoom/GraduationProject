@@ -66,7 +66,7 @@ class GPTActor(nn.Module):
         # 根据给定的索引（index）张量，
         # 从源张量（input）沿指定的维度（dim）抓取对应位置的值，放入新张量
         # index各个维度大小要与input除dim外保持一致
-        # dim表示在哪个维度上进行softmax操作
+        # dim: 指定维度
         # gather输出形状是index的形状
         log_prob_output = log_prob_all_vocab.gather(dim=2, index=index) # 教师强制：取出真实下一个 token 的对数概率
 
@@ -111,14 +111,14 @@ class GPTActor(nn.Module):
 
         diffw_list = torch.ones_like(idx) * 2 # 初始值：2
         diffstep_list = torch.ones_like(idx)  # 初始值：1
-        # TODO明天先看这个 priority：MAX
+
         for curr_pos in range(min_input_length, total_length):
             # forward the model to get the logits, diffw and diffstep for the index in the sequence
             # 在每个位置 模型前向传播
             logits, diffw, diffstep = self(idx[:, :curr_pos])  # B, T, vocab_size   B, T, 5   B, T, 3
 
             # pluck the logits at the final step and scale by desired temperature
-            # 最后一步 进行温度缩放
+            # 只取最后一步 进行温度缩放
             logits = logits[:, -1, :] / temperature
             diffw = diffw[:, -1, :] / temperature
             diffstep = diffstep[:, -1, :] / temperature

@@ -120,6 +120,113 @@ class PPOTrainer(Trainer):
         self.save_hyperparams(hp)
         print("Initialized PPO Trainer")
 
+    def trans_token(self, bef_list, diffw_list, diffstep_list):
+        '''
+        将原始 token 序列转换为带动态参数格式
+        例：[house] -> [house:0-1:1.0]
+        插入逻辑：根据 diffw/diffstep 统计结果选择最优参数
+        '''
+        if len(bef_list) == 0:
+            return bef_list
+        aft_list = torch.tensor([], device=bef_list.device)
+        ind = 0
+        token = bef_list[ind]
+
+        def get_modes(special_token_ind_list):
+            """根据 special token 索引计算 diffw 和 diffstep 的 mode"""
+            try:
+                w_counts = torch.bincount(diffw_list[special_token_ind_list])
+                w_mode = int(torch.argmax(w_counts).item())
+            except (RuntimeError, ValueError, IndexError):
+                w_mode = 2
+            try:
+                counts = torch.bincount(diffstep_list[special_token_ind_list])
+                mode = int(torch.argmax(counts).item())
+            except (RuntimeError, ValueError, IndexError):
+                mode = 1
+            return w_mode, mode
+
+        def insert_special_tokens(special_token_ind_list, w_mode, mode):
+            """根据 mode 和 w_mode 插入动态 token 格式"""
+            for idx in special_token_ind_list:
+                s_token = bef_list[idx]
+                aft_list_local = torch.cat([
+                    self.token_dict["["].unsqueeze(0),
+                    s_token.unsqueeze(0),
+                    self.token_dict[":"].unsqueeze(0),
+                    self.step_dict[mode],
+                    self.token_dict[":"].unsqueeze(0),
+                    self.w_dict[w_mode],
+                    self.token_dict["]"].unsqueeze(0)
+                ])
+                nonlocal aft_list
+                aft_list = torch.cat([aft_list, aft_list_local])
+
+        if not (token == self.token_dict[","] or token == self.token_dict["."]):
+            # --- 处理开头非逗号句号的情况 ---
+            while not (token == self.token_dict[","] or token == self.token_dict["."] or token == self.token_dict[" "]):
+                token = bef_list[ind]
+                aft_list = torch.cat([aft_list, token.unsqueeze(0)])
+                ind += 1
+                if ind >= len(bef_list):
+                    break
+            if ind < len(bef_list):
+                token = bef_list[ind]
+
+            special_token_ind_list = []
+            while ind < len(bef_list) and not (
+                    token == self.token_dict[","] or token == self.token_dict["."] or self.tokenizer.decode(
+                    [token.long()]).startswith(" ")):
+                if token == self.token_dict[" "]:
+                    aft_list = torch.cat([aft_list, token.unsqueeze(0)])
+                    ind += 1
+                    if ind >= len(bef_list):
+                        break
+                    token = bef_list[ind]
+                else:
+                    special_token_ind_list.append(ind)
+                    ind += 1
+                    if ind >= len(bef_list):
+                        break
+                    token = bef_list[ind]
+                    if token == self.token_dict[","] or token == self.token_dict["."]:
+                        break
+
+            w_mode, mode = get_modes(special_token_ind_list)
+            insert_special_tokens(special_token_ind_list, w_mode, mode)
+            ind += 1
+
+        # --- 开始统一处理后续所有 token ---
+        while ind < len(bef_list):
+            token = bef_list[ind]
+
+            if not (token == self.token_dict[","] or token == self.token_dict["."]):
+                aft_list = torch.cat([aft_list, token.unsqueeze(0)])
+                ind += 1
+            else:
+                ind += 1
+                if ind >= len(bef_list):
+                    break
+                token = bef_list[ind]
+
+                special_token_ind_list = []
+                while not (token == self.token_dict[","] or token == self.token_dict["."]):
+                    special_token_ind_list.append(ind)
+                    ind += 1
+                    if ind >= len(bef_list):
+                        break
+                    token = bef_list[ind]
+                    if token == self.token_dict[","] or token == self.token_dict["."]:
+                        break
+
+                aft_list = torch.cat([aft_list, self.token_dict[","].unsqueeze(0)])
+
+                w_mode, mode = get_modes(special_token_ind_list)
+                insert_special_tokens(special_token_ind_list, w_mode, mode)
+                ind += 1
+
+        return aft_list
+
     def kl_penalized_reward(
             self,
             reward: torch.Tensor,
@@ -421,111 +528,3 @@ class PPOTrainer(Trainer):
 
         self.save_states(None, True)
 
-
-
-    def trans_token(self, bef_list, diffw_list, diffstep_list):
-        '''
-        将原始 token 序列转换为带动态参数格式
-        例：[house] -> [house:0-1:1.0]
-        插入逻辑：根据 diffw/diffstep 统计结果选择最优参数
-        '''
-        if len(bef_list) == 0:
-            return bef_list
-        aft_list = torch.tensor([], device=bef_list.device)
-        ind = 0
-        token = bef_list[ind]
-
-        def get_modes(special_token_ind_list):
-            """根据 special token 索引计算 diffw 和 diffstep 的 mode"""
-            try:
-                w_counts = torch.bincount(diffw_list[special_token_ind_list])
-                w_mode = int(torch.argmax(w_counts).item())
-            except (RuntimeError, ValueError, IndexError):
-                w_mode = 2
-            try:
-                counts = torch.bincount(diffstep_list[special_token_ind_list])
-                mode = int(torch.argmax(counts).item())
-            except (RuntimeError, ValueError, IndexError):
-                mode = 1
-            return w_mode, mode
-
-        def insert_special_tokens(special_token_ind_list, w_mode, mode):
-            """根据 mode 和 w_mode 插入动态 token 格式"""
-            for idx in special_token_ind_list:
-                s_token = bef_list[idx]
-                aft_list_local = torch.cat([
-                    self.token_dict["["].unsqueeze(0),
-                    s_token.unsqueeze(0),
-                    self.token_dict[":"].unsqueeze(0),
-                    self.step_dict[mode],
-                    self.token_dict[":"].unsqueeze(0),
-                    self.w_dict[w_mode],
-                    self.token_dict["]"].unsqueeze(0)
-                ])
-                nonlocal aft_list
-                aft_list = torch.cat([aft_list, aft_list_local])
-
-        if not (token == self.token_dict[","] or token == self.token_dict["."]):
-            # --- 处理开头非逗号句号的情况 ---
-            while not (token == self.token_dict[","] or token == self.token_dict["."] or token == self.token_dict[" "]):
-                token = bef_list[ind]
-                aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-                ind += 1
-                if ind >= len(bef_list):
-                    break
-            if ind < len(bef_list):
-                token = bef_list[ind]
-
-            special_token_ind_list = []
-            while ind < len(bef_list) and not (
-                    token == self.token_dict[","] or token == self.token_dict["."] or self.tokenizer.decode(
-                    [token.long()]).startswith(" ")):
-                if token == self.token_dict[" "]:
-                    aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-                    ind += 1
-                    if ind >= len(bef_list):
-                        break
-                    token = bef_list[ind]
-                else:
-                    special_token_ind_list.append(ind)
-                    ind += 1
-                    if ind >= len(bef_list):
-                        break
-                    token = bef_list[ind]
-                    if token == self.token_dict[","] or token == self.token_dict["."]:
-                        break
-
-            w_mode, mode = get_modes(special_token_ind_list)
-            insert_special_tokens(special_token_ind_list, w_mode, mode)
-            ind += 1
-
-        # --- 开始统一处理后续所有 token ---
-        while ind < len(bef_list):
-            token = bef_list[ind]
-
-            if not (token == self.token_dict[","] or token == self.token_dict["."]):
-                aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-                ind += 1
-            else:
-                ind += 1
-                if ind >= len(bef_list):
-                    break
-                token = bef_list[ind]
-
-                special_token_ind_list = []
-                while not (token == self.token_dict[","] or token == self.token_dict["."]):
-                    special_token_ind_list.append(ind)
-                    ind += 1
-                    if ind >= len(bef_list):
-                        break
-                    token = bef_list[ind]
-                    if token == self.token_dict[","] or token == self.token_dict["."]:
-                        break
-
-                aft_list = torch.cat([aft_list, self.token_dict[","].unsqueeze(0)])
-
-                w_mode, mode = get_modes(special_token_ind_list)
-                insert_special_tokens(special_token_ind_list, w_mode, mode)
-                ind += 1
-
-        return aft_list
