@@ -25,7 +25,6 @@ class SFTTrainer_head(Trainer):
         print(f"self.run_name:{self.run_name}")
         self.device = device
         self.max_steps = cfg.max_steps
-        self.eval_freq = 1
         self.save_freq = 2e4  # 模型保存频率
 
         self.train_dataloader = iter(DataLoader(
@@ -57,7 +56,6 @@ class SFTTrainer_head(Trainer):
         random_values = np.clip(random_values, min(values), max(values))
         random_values = np.round(random_values)
         tensor = torch.tensor(random_values, device=self.device)
-
         return tensor
 
     def fit(self):
@@ -66,7 +64,9 @@ class SFTTrainer_head(Trainer):
 
         opt_model = self.model
         opt_model.to(self.device)
-        # 记录训练日志
+        # 记录训练日志  max_queue：攒够这么多条才写入文件
+        # 查看本地日志：tensorboard --logdir=./runs
+        # TODO：自动 flush() ；根据 batch size 自动调整 max_queue
         writer = SummaryWriter(f"./runs/{self.run_name}/logs", max_queue=40)
         scaler = GradScaler(enabled = self.dtype != torch.float32)  # 混合精度训练
 
