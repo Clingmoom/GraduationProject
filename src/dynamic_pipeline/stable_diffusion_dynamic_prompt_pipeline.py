@@ -34,36 +34,38 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
         # 遍历提示词中的每个字符
         while ind < len(prompt):
             if prompt[ind] != "[":
-                current += prompt[ind]
+                current += prompt[ind] # 不是[的字符直接加入current
                 ind += 1
-            else:
-                current_tokens = self.tokenizer.tokenize(current)
-                index_in_all_tokens = len(current_tokens)
-                special_token_str = ""
+            else: # 遇到[
+                current_tokens = self.tokenizer.tokenize(current) # 对当前的current进行分词
+                index_in_all_tokens = len(current_tokens) # 当前current的token数
+                special_token_str = "" # 三元组字符串
                 ind += 1
                 while ind <len(prompt) and prompt[ind] != "]":
                     special_token_str += prompt[ind]
                     ind += 1
-                if ind >= len(prompt) and prompt[ind - 1] != "]":
+                if ind >= len(prompt) and prompt[ind - 1] != "]": # 如果遍历到了提示词的末尾，但是没有遇到]，并跳过错误的格式
                     ind += len(special_token_str)
                     current += special_token_str
-                else:
-                    res = special_token_str.split(":")
+                else: # 遇到]
+                    res = special_token_str.split(":") # 按:分割特殊标记
                     if len(res) == 3:
                         text, steps_raw, weight_raw = res
                         try:
                             # 解析特殊标记的步骤和权重
-                            endtimestep, starttimestep = map(lambda x: int(float(x) * num_inference_steps),
+                            # map函数将lambda函数应用于steps_raw.split("-")返回的每个元素上
+                            # num_inference_steps是总采样步数，denoising 的迭代次数
+                            # prompt中的step是归一化的 0.5-1.0 ，需要转化为实际的step
+                            end_time_step, start_time_step = map(lambda x: int(float(x) * num_inference_steps),
                                                              steps_raw.split("-"))
-                            steps = list(range(endtimestep + 1, starttimestep + 1))[::-1]
+                            steps = list(range(end_time_step + 1, start_time_step + 1))[::-1]
                             steps = [num_inference_steps - i for i in steps]
                             weight = float(weight_raw)
                             text_tokens = self.tokenizer.tokenize(text)
+                            # 处理当前词被分成多个token时的情况
                             for sub_ind, sub_token in enumerate(text_tokens):
                                 sub_text = self.tokenizer.convert_tokens_to_string(sub_token)
-
-                                special_tokens.append(
-                                    SpecialToken(sub_text, index_in_all_tokens + sub_ind, steps, weight))
+                                special_tokens.append(SpecialToken(sub_text, index_in_all_tokens + sub_ind, steps, weight))
                             index_in_all_tokens = index_in_all_tokens - 1 + len(text_tokens)
                             ind += 1
                             current += text
@@ -73,7 +75,7 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                     else:
                         ind += len(special_token_str)
                         current += special_token_str
-                # 处理可能的标记合并
+                # TODO: from here tomorrow
                 if len(self.tokenizer.tokenize(current)) <= index_in_all_tokens and special_tokens != []:
                     diff = index_in_all_tokens - len(self.tokenizer.tokenize(current)) + 2
                     merged_text = ""
@@ -117,6 +119,8 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
             clean_prompt_set.add(clean_prompt_of_step)
 
         return clean_prompt_and_specialtoken_weightindex_pair, clean_prompt_set
+
+
 
     def _encode_prompt(
             self,
