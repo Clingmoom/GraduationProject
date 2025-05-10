@@ -48,7 +48,7 @@ class PPOTrainer(Trainer):
         #self.sft_model = cast(GPTActor, torch.compile(self.orig_sft_model)) # 参考网络
 
         # 初始化评分器 （基于StableDiffusion生成图片后的PickScore+CLIP+Aesthetic）
-        self.scorer =PromptScorer(device=device,num_images_per_prompt=num_images_per_prompt)
+        self.scorer =PromptScorer(device=device, num_images_per_prompt=num_images_per_prompt)
 
         # Separate actor loss from critic loss to save optimizer memory
         self.actor_criterion = PolicyLoss()

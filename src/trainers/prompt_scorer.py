@@ -13,7 +13,7 @@ from ..configs import ROOT_DIR
 
 
 class PromptScorer:
-    def __init__(self ,device ,num_images_per_prompt=2 ,seed=None):
+    def __init__(self , device, num_images_per_prompt=2, seed=None):
         # init scorer hparams
         self.lambda_aes = 0.05
         self.lambda_clip = 5.0
