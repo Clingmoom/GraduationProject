@@ -99,22 +99,21 @@ def trans_token(bef_list, diffw_list, diffstep_list):
 
     def get_modes(special_token_ind_list):
         try:
-            w_counts = torch.bincount(diffw_list[special_token_ind_list])
-            w_mode = int(torch.argmax(w_counts).item())
+            w_counts = torch.bincount(diffw_list[special_token_ind_list]) # 统计每个权重出现的次数
+            w_mode = int(torch.argmax(w_counts).item()) # 找到出现次数最多的权重
         except:
-            w_mode = 2  # default to 1.0
-
+            w_mode = 2
         try:
             counts = torch.bincount(diffstep_list[special_token_ind_list])
             mode = int(torch.argmax(counts).item())
         except:
-            mode = 1  # default to 0-1
+            mode = 1
         return w_mode, mode
 
     def insert_tokens(special_token_ind_list, w_mode, mode):
         nonlocal aft_list
-        for ind in special_token_ind_list:
-            s_token = bef_list[ind]
+        for idx in special_token_ind_list:
+            s_token = bef_list[idx]
             parts = [
                 token_dict["["].unsqueeze(0),
                 s_token.unsqueeze(0),
@@ -126,30 +125,22 @@ def trans_token(bef_list, diffw_list, diffstep_list):
             ]
             aft_list = torch.cat([aft_list] + parts)
 
-    def process_segment():
-        nonlocal ind, aft_list
-        special_token_ind_list = []
-
-        # 收集 special tokens
-        while ind < len(bef_list):
-            token = bef_list[ind]
-            if token in [token_dict[","], token_dict["."], token_dict[" "]] or tokenizer.decode([token.long()]).startswith(" "):
-                break
-            special_token_ind_list.append(ind)
-            ind += 1
-
-        w_mode, mode = get_modes(special_token_ind_list)
-        insert_tokens(special_token_ind_list, w_mode, mode)
-
     while ind < len(bef_list):
         token = bef_list[ind]
-
-        # 普通 token
+        # 当前 token 是普通 token，继续收集
         if token not in [token_dict[","], token_dict["."]]:
-            aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-            ind += 1
+            special_token_ind_list = []
+            # 是否是“词的开始”（避免子词或空格开头）
+            while ind < len(bef_list):
+                token = bef_list[ind]
+                if token in [token_dict[","], token_dict["."], token_dict[" "]] or tokenizer.decode([token.long()]).startswith(" "):
+                    break
+                aft_list = torch.cat([aft_list, token.unsqueeze(0)])
+                ind += 1
+            if ind >= len(bef_list):
+                break
         else:
-            # 遇到 , 或 . 时，先跳过标点，收集后续 token 再处理
+            # 遇到标点，标点后开始收集下一段 special tokens
             punct_token = token
             ind += 1
             special_token_ind_list = []
@@ -158,13 +149,15 @@ def trans_token(bef_list, diffw_list, diffstep_list):
                 token = bef_list[ind]
                 if token in [token_dict[","], token_dict["."]]:
                     break
-                special_token_ind_list.append(ind)
+                if not tokenizer.decode([token.long()]).startswith(" "):
+                    special_token_ind_list.append(ind)
                 ind += 1
 
             aft_list = torch.cat([aft_list, punct_token.unsqueeze(0)])
 
-            w_mode, mode = get_modes(special_token_ind_list)
-            insert_tokens(special_token_ind_list, w_mode, mode)
+            if special_token_ind_list:
+                w_mode, mode = get_modes(special_token_ind_list)
+                insert_tokens(special_token_ind_list, w_mode, mode)
 
     return aft_list
 

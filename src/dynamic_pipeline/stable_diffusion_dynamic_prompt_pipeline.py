@@ -37,8 +37,6 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                 current += prompt[ind]
                 ind += 1
             else:
-                # enter special token
-                # step1: tokenize current
                 current_tokens = self.tokenizer.tokenize(current)
                 index_in_all_tokens = len(current_tokens)
                 special_token_str = ""
