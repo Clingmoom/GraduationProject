@@ -140,7 +140,7 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
 
     def _encode_prompt(
             self,
-            prompt,
+            prompt :str,
             device,
             num_images_per_prompt,
             do_classifier_free_guidance, # 是否使用classifier free guidance（无分类器引导）
@@ -176,7 +176,7 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
             lora_scale (`float`, *optional*):
                 A lora scale that will be applied to all LoRA layers of the text encoder if LoRA layers are loaded.
         """
-        assert isinstance(prompt, str), "`_encode_prompt()` 只支持处理单个 prompt 字符串！"
+        assert isinstance(prompt, str)
         batch_size = 1
 
         if lora_scale is not None and isinstance(self, LoraLoaderMixin):
@@ -186,7 +186,7 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
             prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
 
         clean_prompt_and_special_token_weight_index_pair, clean_prompt_set = self.parse_single_prompt(prompt, num_inference_steps)
-        # TODO: from here tomorrow
+
         # 编码每个干净提示词
         clean_prompt_to_prompt_embeds = dict()
         for clean_prompt in clean_prompt_set:
@@ -464,6 +464,8 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                             neg_p_, pos_p_ = torch.chunk(prompt_embeds_dict[k], 2)
                             neg_p_cat = torch.cat([neg_p_, neg_p])
                             pos_p_cat = torch.cat([pos_p_, pos_p])
+
+                            # 拼接 batch，让多个 prompt 可以合并一起喂给模型
                             prompt_embeds_dict[k] = torch.cat([neg_p_cat, pos_p_cat])
                         else:
                             prompt_embeds_dict[k] = torch.cat([prompt_embeds_dict[k], new_v])
