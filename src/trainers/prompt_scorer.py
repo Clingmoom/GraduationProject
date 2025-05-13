@@ -164,9 +164,9 @@ class PromptScorer:
         else:
             return prediction.item()
 
-    def gen_image_batched(self, prompts ,save=None ,save_path="./image"):
+    def gen_image_batched(self, prompts, save=None, save_path="./image"):
         images = []
-        bsz =8
+        bsz = 8
         if self.seed != None:
             for i in range(0, len(prompts), bsz):
                 pmpts = prompts[i : i + bsz]

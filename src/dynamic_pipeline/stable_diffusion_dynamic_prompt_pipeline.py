@@ -8,45 +8,54 @@ from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import resca
 from .special_token import SpecialToken
 
 
-def delete_elements(list_input, indexes):
-    indexes.sort(reverse=True)
+def delete_elements(
+    list_input: List[Any], indexes: List[int]
+) -> Tuple[List[Any], Dict[int, Optional[int]]]:
+    indexes_set = set(indexes)  # O(1) 查找
+    new_list = []
     index_mapping = {}
-    for i in range(len(list_input)):
-        if i in indexes:
-            index_mapping[i] = None
-        else:
-            index_mapping[i] = i - len([j for j in indexes if j < i])
 
-    for index in indexes:
-        if index < len(list_input):
-            del list_input[index]
-    return list_input, index_mapping
+    new_idx = 0
+    for old_idx, item in enumerate(list_input):
+        if old_idx in indexes_set:
+            index_mapping[old_idx] = None
+        else:
+            index_mapping[old_idx] = new_idx
+            new_list.append(item)
+            new_idx += 1
+
+    return new_list, index_mapping
 
 
 class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
 
     def parse_single_prompt(self, prompt :str, num_inference_steps :int):
         prompt = prompt.replace("[ " ," [")
-        # parse single prompt with special format. return clean prompt,special token indexes and their time steps and weights
-        current = ""
+
+        current_chars = []  # 用于高效构造 current
         special_tokens = []
         ind = 0
+
         # 遍历提示词中的每个字符
         while ind < len(prompt):
             if prompt[ind] != "[":
-                current += prompt[ind] # 不是[的字符直接加入current
+                current_chars.append(prompt[ind]) # 不是[的字符直接加入current
                 ind += 1
             else: # 遇到[
-                current_tokens = self.tokenizer.tokenize(current) # 对当前的current进行分词
-                index_in_all_tokens = len(current_tokens) # 当前current的token数
+                current = ''.join(current_chars)
+                current_tokens = self.tokenizer.tokenize(current) # 对当前current内普通字符进行分词
+                index_in_all_tokens = len(current_tokens) # 特殊三元组起始的索引
                 special_token_str = "" # 三元组字符串
                 ind += 1
+
+                # 抓取[]中的内容
                 while ind <len(prompt) and prompt[ind] != "]":
                     special_token_str += prompt[ind]
                     ind += 1
+
                 if ind >= len(prompt) and prompt[ind - 1] != "]": # 如果遍历到了提示词的末尾，但是没有遇到]，并跳过错误的格式
                     ind += len(special_token_str)
-                    current += special_token_str
+                    current_chars.extend(special_token_str)
                 else: # 遇到]
                     res = special_token_str.split(":") # 按:分割特殊标记
                     if len(res) == 3:
@@ -56,26 +65,28 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                             # map函数将lambda函数应用于steps_raw.split("-")返回的每个元素上
                             # num_inference_steps是总采样步数，denoising 的迭代次数
                             # prompt中的step是归一化的 0.5-1.0 ，需要转化为实际的step
-                            end_time_step, start_time_step = map(lambda x: int(float(x) * num_inference_steps),
-                                                             steps_raw.split("-"))
+                            end_time_step, start_time_step = map(lambda x: int(float(x) * num_inference_steps), steps_raw.split("-"))
                             steps = list(range(end_time_step + 1, start_time_step + 1))[::-1]
                             steps = [num_inference_steps - i for i in steps]
                             weight = float(weight_raw)
                             text_tokens = self.tokenizer.tokenize(text)
+
                             # 处理当前词被分成多个token时的情况
                             for sub_ind, sub_token in enumerate(text_tokens):
                                 sub_text = self.tokenizer.convert_tokens_to_string(sub_token)
                                 special_tokens.append(SpecialToken(sub_text, index_in_all_tokens + sub_ind, steps, weight))
                             index_in_all_tokens = index_in_all_tokens - 1 + len(text_tokens)
                             ind += 1
-                            current += text
+                            current_chars.extend(text)
                         except:
                             ind += len(special_token_str)
-                            current += special_token_str
+                            current_chars.extend(special_token_str)
                     else:
                         ind += len(special_token_str)
-                        current += special_token_str
-                # TODO: from here tomorrow
+                        current_chars.extend(special_token_str)
+
+                # 补救逻辑：合并最近几个 special token
+                current = ''.join(current_chars)
                 if len(self.tokenizer.tokenize(current)) <= index_in_all_tokens and special_tokens != []:
                     diff = index_in_all_tokens - len(self.tokenizer.tokenize(current)) + 2
                     merged_text = ""
@@ -91,13 +102,14 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                             break
                     special_tokens.append(SpecialToken(merged_text, merged_index_in_all_tokens, merged_steps, merged_weight))
                     # print(special_tokens)
+
         # 生成每个步骤的干净提示词和特殊标记的权重索引对
-        clean_prompt_of_all = current
+        clean_prompt_of_all = ''.join(current_chars)
         tokens_of_all = self.tokenizer.tokenize(clean_prompt_of_all)
-        clean_prompt_and_specialtoken_weightindex_pair = { }
+        clean_prompt_and_special_token_weight_index_pair = { }
         clean_prompt_set = set()
         for step in range(num_inference_steps):
-            tokens_of_step = [t for t in tokens_of_all]
+            tokens_of_step = [t for t in tokens_of_all] #深拷贝副本
             removed_indexes = []
             sp_list_of_step = []
             for sp_token in special_tokens:
@@ -105,8 +117,11 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                     removed_indexes.append(sp_token.index_in_all_tokens)
                 else:
                     sp_list_of_step.append((sp_token.weight, sp_token.index_in_all_tokens))
+
             removed_indexes.sort(reverse=False)
             tokens_of_step, index_mapping = delete_elements(tokens_of_step, removed_indexes)
+
+            # 更新 sp_list_of_step 中的索引
             sp_list_of_step_copy = sp_list_of_step.copy()
             # pdb.set_trace()
             for w, i in sp_list_of_step_copy:
@@ -114,24 +129,25 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                     sp_list_of_step.append((w, index_mapping[i]))
                 except:
                     continue
+
             clean_prompt_of_step = self.tokenizer.convert_tokens_to_string(tokens_of_step)
-            clean_prompt_and_specialtoken_weightindex_pair[step] = (clean_prompt_of_step, sp_list_of_step)
+            clean_prompt_and_special_token_weight_index_pair[step] = (clean_prompt_of_step, sp_list_of_step)
             clean_prompt_set.add(clean_prompt_of_step)
 
-        return clean_prompt_and_specialtoken_weightindex_pair, clean_prompt_set
+        return clean_prompt_and_special_token_weight_index_pair, clean_prompt_set
 
 
 
     def _encode_prompt(
             self,
-            prompt,
+            prompt :str,
             device,
             num_images_per_prompt,
-            do_classifier_free_guidance,
+            do_classifier_free_guidance, # 是否使用classifier free guidance（无分类器引导）
             negative_prompt=None,
-            prompt_embeds: Optional[torch.FloatTensor] = None,
+            prompt_embeds: Optional[torch.FloatTensor] = None, # 提示词的嵌入表示
             negative_prompt_embeds: Optional[torch.FloatTensor] = None,
-            lora_scale: Optional[float] = None,
+            lora_scale: Optional[float] = None, # lora的缩放因子
             num_inference_steps=50
     ):
         r"""
@@ -160,32 +176,17 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
             lora_scale (`float`, *optional*):
                 A lora scale that will be applied to all LoRA layers of the text encoder if LoRA layers are loaded.
         """
-        # 检查提示词类型
         assert isinstance(prompt, str)
-        # set lora scale so that monkey patched LoRA
-        # function of text encoder can correctly access it
+        batch_size = 1
+
         if lora_scale is not None and isinstance(self, LoraLoaderMixin):
             self._lora_scale = lora_scale
-
-        if prompt is not None and isinstance(prompt, str):
-            batch_size = 1
-        elif prompt is not None and isinstance(prompt, list):
-            batch_size = len(prompt)
-        else:
-            batch_size = prompt_embeds.shape[0]
 
         if isinstance(self, TextualInversionLoaderMixin):
             prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
 
-        ### Prompt parsing by Terry Zhang
-        # step 1: find all special tokens that has [] surrounded, find their indexes after tokenizing
-        if isinstance(prompt, str):
-            prompts = [prompt]
-        else:
-            prompts = prompt
-        prompt_raw = prompt
-        clean_prompt_and_specialtoken_weightindex_pair, clean_prompt_set = self.parse_single_prompt(prompt_raw,
-                                                                                                    num_inference_steps)
+        clean_prompt_and_special_token_weight_index_pair, clean_prompt_set = self.parse_single_prompt(prompt, num_inference_steps)
+
         # 编码每个干净提示词
         clean_prompt_to_prompt_embeds = dict()
         for clean_prompt in clean_prompt_set:
@@ -199,16 +200,14 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
             text_input_ids = text_inputs.input_ids
             untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pt").input_ids
 
-            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(
-                    text_input_ids, untruncated_ids
-            ):
+            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(text_input_ids, untruncated_ids):
                 removed_text = self.tokenizer.batch_decode(
                     untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
                 )
-                # print(
-                #     "The following part of your input was truncated because CLIP can only handle sequences up to"
-                #     f" {self.tokenizer.model_max_length} tokens: {removed_text}"
-                # )
+                print(
+                    "The following part of your input was truncated because CLIP can only handle sequences up to"
+                    f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+                )
 
             if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
                 attention_mask = text_inputs.attention_mask.to(device)
@@ -236,7 +235,7 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
             prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
             clean_prompt_to_prompt_embeds[clean_prompt] = prompt_embeds
 
-        # 处理无条件嵌入
+        # 处理 无条件嵌入 无分类器引导
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             uncond_tokens: List[str]
@@ -289,8 +288,8 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
 
         # 生成每个步骤的提示词嵌入
         prompt_embeds_dict = {}
-        for step in clean_prompt_and_specialtoken_weightindex_pair.keys():
-            clean_prompt_of_step, sp_list_of_step = clean_prompt_and_specialtoken_weightindex_pair[step]
+        for step in clean_prompt_and_special_token_weight_index_pair.keys():
+            clean_prompt_of_step, sp_list_of_step = clean_prompt_and_special_token_weight_index_pair[step]
             prompt_embeds_of_step = clean_prompt_to_prompt_embeds[clean_prompt_of_step]
             weight = torch.ones_like(prompt_embeds_of_step)
 
@@ -404,11 +403,14 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                 second element is a list of `bool`s indicating whether the corresponding generated image contains
                 "not-safe-for-work" (nsfw) content.
         """
+
         assert prompt_embeds is None
         assert negative_prompt_embeds is None
+
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
+
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
             prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
@@ -428,8 +430,11 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
         # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
 
+        # 4. Prepare timesteps
+        # 提前获取timesteps 下面要用
         self.scheduler.set_timesteps(num_inference_steps, device=device)
         timesteps = self.scheduler.timesteps
+
         # 3. Encode input prompt
         text_encoder_lora_scale = (
             cross_attention_kwargs.get("scale", None) if cross_attention_kwargs is not None else None
@@ -459,6 +464,8 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                             neg_p_, pos_p_ = torch.chunk(prompt_embeds_dict[k], 2)
                             neg_p_cat = torch.cat([neg_p_, neg_p])
                             pos_p_cat = torch.cat([pos_p_, pos_p])
+
+                            # 拼接 batch，让多个 prompt 可以合并一起喂给模型
                             prompt_embeds_dict[k] = torch.cat([neg_p_cat, pos_p_cat])
                         else:
                             prompt_embeds_dict[k] = torch.cat([prompt_embeds_dict[k], new_v])
@@ -475,8 +482,6 @@ class StableDiffusionDynamicPromptPipeline(StableDiffusionPipeline):
                 lora_scale=text_encoder_lora_scale,
                 num_inference_steps=len(timesteps)
             )
-
-        # 4. Prepare timesteps
 
         # 5. Prepare latent variables
         num_channels_latents = self.unet.config.in_channels

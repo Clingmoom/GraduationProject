@@ -28,7 +28,7 @@ class PPOTrainer(Trainer):
         sft_model: GPTActor,
         train_dataset,
         device,
-        num_images_per_prompt = None
+        num_images_per_prompt
     ) -> None:
         super().__init__()
         self.cfg = cfg
