@@ -167,14 +167,10 @@ def generate_gpt2(model, prompt, device):
 
     x, decode = prepare_gpt2_input(prompt, device)
     max_new_tokens = 75-x.shape[-1]
-    y, diffw_list, diffstep_list = model.generate_dy(x,
-                           max_new_tokens,
-                           temperature=temperature,
-                           top_k=top_k)
+    y, diffw_list, diffstep_list = model.generate_dy(x, max_new_tokens, temperature=temperature, top_k=top_k)
     if y.shape == torch.Size([0]):
         return prompt
-    y_0=y[0].long()
-
+    y_0=y[0].long() # 生成的token序列
     input_w = diffw_list[0].long()
     input_step = diffstep_list[0].long()
 
@@ -196,6 +192,7 @@ def generate_gpt2(model, prompt, device):
 
     return res
 
+
 tic = time.time()
 scorer = PromptScorer(device=device, num_images_per_prompt=1, seed=opt_a.seed)
 bs = 5
@@ -211,7 +208,7 @@ elif opt_a.data == "lexica":
     data = data.reshape(1000, 1)
 
 prompt_all = []
-aes_sum, clip_scores_sum, final_scores_sum = [torch.tensor(0.0) for i in range(3)]
+aes_sum, clip_scores_sum = [torch.tensor(0.0) for i in range(2)]
 
 save_path = opt_a.save
 os.makedirs(save_path, exist_ok=True)
@@ -224,8 +221,8 @@ with torch.inference_mode():
             p = i + 25
         else:
             p = len(data)
-        plain_texts = [s[0] for s in data[i:p]]
-        prompt = [generate_gpt2(gpt_sft, s, device) for s in plain_texts]
+        plain_texts = [s[0] for s in data[i:p]] # ["A photo of a cat", "A photo of a dog"...]
+        prompt = [generate_gpt2(gpt_sft, s, device) for s in plain_texts] # s:"A photo of a cat"
         prompt_all += prompt
         if p > 998:
             print(prompt, i)
