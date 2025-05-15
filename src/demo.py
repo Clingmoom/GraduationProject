@@ -1,13 +1,10 @@
 import torch
-import time
-import pickle
-import numpy as np
-import argparse, os
+import argparse
+import os
 
-from transformers import GPT2Tokenizer
-from .configs import get_configs, ROOT_DIR
 from src.models import GPTActor
-from src.trainers import PromptScorer
+from src.configs import get_configs
+from transformers import GPT2Tokenizer
 
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -17,19 +14,13 @@ parser.add_argument(
     "--ckpt",
     type=str,
     nargs="?",
-    default=ROOT_DIR / "ckpt" / "PAE" / "actor_step3000.pt",
-)
-parser.add_argument(
-    "--save",
-    type=str,
-    nargs="?",
-    default="./result",
+    default="ckpt/PAE/actor_step3000.pt",
 )
 parser.add_argument(
     "--prompt",
     type=str,
     nargs="?",
-    default="A photo of a cat",
+    default="a photo of a happy cat",
 )
 parser.add_argument(
     "--seed",
@@ -43,12 +34,6 @@ parser.add_argument(
     nargs="?",
     default=0,
 )
-parser.add_argument(
-    "--data",
-    type=str,
-    nargs="?",
-    default="coco",
-)
 
 opt_a = parser.parse_args()
 torch.manual_seed(opt_a.seed)
@@ -60,35 +45,38 @@ tokenizer = GPT2Tokenizer.from_pretrained("gpt2", device=device)
 
 def prepare_gpt2_input(prompt, device):
     enc = tokenizer
+    # 定义编码和解码函数，允许使用 文本结束 的特殊字符
     encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
     decode = lambda l: enc.decode(l)
     indices = encode(prompt)
+    # 使用 None 在第0维添加一个新维度，使得张量的形状从 [n] 变为 [1, n]
+    # 其中 ... 表示保持 indices 的原始形状不变
     x = (torch.tensor(indices, dtype=torch.long, device=device)[None, ...])
     return x, decode
 
 step_dict = {
-    0: torch.tensor(tokenizer.encode("0-0.5"),device=device),#0-0.5
-    1: torch.tensor(tokenizer.encode("0-1"),device=device), #0-1
-    2: torch.tensor(tokenizer.encode("0.5-1"),device=device),#0.5-1
+    0: torch.tensor(tokenizer.encode("0-0.5"), device=device),  # 0-0.5
+    1: torch.tensor(tokenizer.encode("0-1"), device=device),  # 0-1
+    2: torch.tensor(tokenizer.encode("0.5-1"), device=device),  # 0.5-1
 }
 w_dict = {
-    0: torch.tensor(tokenizer.encode("0.5"),device=device),
-    1: torch.tensor(tokenizer.encode("0.75"),device=device),
-    2: torch.tensor(tokenizer.encode("1.0"),device=device),
-    3: torch.tensor(tokenizer.encode("1.25"),device=device),
-    4: torch.tensor(tokenizer.encode("1.5"),device=device),
+    0: torch.tensor(tokenizer.encode("0.5"), device=device),
+    1: torch.tensor(tokenizer.encode("0.75"), device=device),
+    2: torch.tensor(tokenizer.encode("1.0"), device=device),
+    3: torch.tensor(tokenizer.encode("1.25"), device=device),
+    4: torch.tensor(tokenizer.encode("1.5"), device=device),
 }
 token_dict = {
-    ",": torch.tensor(tokenizer.encode(",")[0],device=device),
-    ".": torch.tensor(tokenizer.encode(".")[0],device=device),
-    ":": torch.tensor(tokenizer.encode(":")[0],device=device),
-    " [": torch.tensor(tokenizer.encode(" [")[0],device=device),
-    "[": torch.tensor(tokenizer.encode("[")[0],device=device),
-    "]": torch.tensor(tokenizer.encode("]")[0],device=device),
-    " ": torch.tensor(tokenizer.encode(" ")[0],device=device)
+    ",": torch.tensor(tokenizer.encode(",")[0], device=device),
+    ".": torch.tensor(tokenizer.encode(".")[0], device=device),
+    ":": torch.tensor(tokenizer.encode(":")[0], device=device),
+    " [": torch.tensor(tokenizer.encode(" [")[0], device=device),
+    "[": torch.tensor(tokenizer.encode("[")[0], device=device),
+    "]": torch.tensor(tokenizer.encode("]")[0], device=device),
+    " ": torch.tensor(tokenizer.encode(" ")[0], device=device)
 }
 
-pattern = r'\[([^]]*):0-1:1\.0\]'#r'\[(\s*\w+):0-1:1\.0\]'
+pattern = r'\[([^]]*):0-1:1\.0\]'  # r'\[(\s*\w+):0-1:1\.0\]'
 
 def trans_token(bef_list, diffw_list, diffstep_list):
     if len(bef_list) == 0:
@@ -161,101 +149,41 @@ def trans_token(bef_list, diffw_list, diffstep_list):
 
     return aft_list
 
+
 def generate_gpt2(model, prompt, device):
-    temperature = 0.9
-    top_k = 200
+    temperature = 0.9 # 控制文本生成的随机性
+    top_k = 200 # 模型生成新词的候选词数量top_k
 
     x, decode = prepare_gpt2_input(prompt, device)
-    max_new_tokens = 75-x.shape[-1]
+    max_new_tokens = 75 - x.shape[-1]
     y, diffw_list, diffstep_list = model.generate_dy(x, max_new_tokens, temperature=temperature, top_k=top_k)
     if y.shape == torch.Size([0]):
         return prompt
-    y_0=y[0].long() # 生成的token序列
+    y_0 = y[0].long()
     input_w = diffw_list[0].long()
     input_step = diffstep_list[0].long()
 
     target_value = torch.tensor(50256, device=device)
-
-    end = (y_0 == target_value).nonzero(as_tuple = True)[0]
+    # nonzero 返回y_0中非零元素的索引
+    end = (y_0 == target_value).nonzero(as_tuple=True)[0]
     if end.numel() > 0:
         y_0 = y_0[:end[0]]
-        input_w=input_w[:end[0]]
-        input_step=input_step[:end[0]]
+        input_w = input_w[:end[0]]
+        input_step = input_step[:end[0]]
 
     res = decode(torch.cat([x[0], trans_token(y_0, input_w, input_step)]))
     end = res.find("[<|endoftext|>")
     if end > 0:
-        res= res[:end]
+        res = res[:end]
     end = res.find("<|endoftext|>")
     if end > 0:
-        res=res[:end]
+        res = res[:end]
 
     return res
 
 
-tic = time.time()
-scorer = PromptScorer(device=device, num_images_per_prompt=1, seed=opt_a.seed)
-bs = 5
-
-if opt_a.data == "coco":
-    filename = ROOT_DIR / "data" / "evaluate_data" / "COCO_test_1k.npy"
-    data = np.load(filename)
-elif opt_a.data == "diffusiondb_test":
-    data = np.load(ROOT_DIR / "data" / "evaluate_data" / "diffusiondb_test_1k.npy")
-    data = data.reshape(1000, 1)
-elif opt_a.data == "lexica":
-    data = np.load(ROOT_DIR / "data" / "evaluate_data" / "lexica_test_1k.npy")
-    data = data.reshape(1000, 1)
-
-prompt_all = []
-aes_sum, clip_scores_sum = [torch.tensor(0.0) for i in range(2)]
-
-save_path = opt_a.save
-os.makedirs(save_path, exist_ok=True)
-
 with torch.inference_mode():
     gpt_sft = torch.compile(GPTActor.from_checkpoint(cfg, sft)).to(device)
     gpt_sft.eval()
-    for i in range(0, len(data), 25):
-        if i + 25 < len(data):
-            p = i + 25
-        else:
-            p = len(data)
-        plain_texts = [s[0] for s in data[i:p]] # ["A photo of a cat", "A photo of a dog"...]
-        prompt = [generate_gpt2(gpt_sft, s, device) for s in plain_texts] # s:"A photo of a cat"
-        prompt_all += prompt
-        if p > 998:
-            print(prompt, i)
-        try:
-            images = scorer.gen_image_batched(prompt)
-            image_features = scorer.get_clip_features(images, is_batched=True)
-            aes_scores = scorer.get_aesthetic_score(image_features, is_batched=True)
-            aes_sum += torch.Tensor(aes_scores).sum()
-
-            clip_scores = scorer.get_clip_score_batched(image_features, plain_texts)
-            clip_scores_sum += torch.Tensor(clip_scores).sum()
-
-            save = [x for x in range(i, p)]
-            [images[ii].save(
-                    os.path.join(save_path, f"{save[ii]:05}.jpg")
-                )for ii in range(len(images))
-            ]
-        except:
-            print("error", prompt, i)
-            exit()
-
-print(opt_a.save, round(aes_sum.item() * 0.001, 2), round(clip_scores_sum.item() * 0.001, 2))
-npy_path = opt_a.save
-os.makedirs(npy_path, exist_ok=True)
-np.save(os.path.join(npy_path, "prompt.npy"), np.array(prompt_all))
-
-data_dict = {
-    "aes": round(aes_sum.item() * 0.001, 2),
-    "clip": round(clip_scores_sum.item() * 0.001, 2),
-}
-
-with open(os.path.join(npy_path, "data_dict.pickle"), "wb") as file:
-    pickle.dump(data_dict, file)
-
-toc = time.time()
-print(f"time:{toc - tic}")
+    result = generate_gpt2(gpt_sft, opt_a.prompt, device)
+    print(result)
