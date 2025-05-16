@@ -5,26 +5,6 @@ if [ -z "$1" ]; then
     echo "❌ 错误：必须传入任务名（如 [1|2]"
     exit 1
 fi
-TASK_NAME="$1"
-# 🎯 参数解析（根据任务名设置默认值）
-if [ "$TASK_NAME" == "1" ]; then
-    batch_size=2
-    exp_name="stage1_exp"
-    step=5000
-    card=0
-elif [ "$TASK_NAME" == "2" ]; then
-    batch_size=2
-    exp_name="stage2_exp"
-    step=1
-    card=0
-    actor="./runs/stage1_step.pt"
-    critic="./runs/stage1_step.pt"
-    num_images_per_prompt=2
-else
-    echo "❌ 错误：未知的任务名 $TASK_NAME，只支持 1 或 2"
-    exit 1
-fi
-
 
 # 📅 构造分支名（按当天日期）
 DATE_STR=$(date +%F)
@@ -40,12 +20,18 @@ git reset --hard origin/$BRANCH_NAME || {
     exit 1
 }
 
-# 🚀 启动训练任务5
+TASK_NAME=$1
+shift  # 去掉第一个参数，剩下的全是给 Python 的参数
+
 echo "🚀 正在运行任务：train_stage_$TASK_NAME"
+
 if [ "$TASK_NAME" == "1" ]; then
-    python ./src/train_stage_1.py -b ${batch_size} -n ${exp_name} -t ${step} -card ${card}
+    python ./src/train_stage_1.py "$@"
 elif [ "$TASK_NAME" == "2" ]; then
-    python ./src/train_stage_2.py -b ${batch_size} -n ${exp_name} -a ${actor} -c ${critic} -e ${step} -card ${card} -num_images_per_prompt ${num_images_per_prompt}
+    python ./src/train_stage_2.py "$@"
+else
+    echo "❌ 错误：未知任务名 $TASK_NAME，只支持 1 或 2"
+    exit 1
 fi
 #source run.sh 1
 #torchrun --standalone --nproc_per_node=1 ./src/train_stage_${TASK_NAME}.py
