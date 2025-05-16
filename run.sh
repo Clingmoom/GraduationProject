@@ -43,9 +43,9 @@ git reset --hard origin/$BRANCH_NAME || {
 # 🚀 启动训练任务5
 echo "🚀 正在运行任务：train_stage_$TASK_NAME"
 if [ "$TASK_NAME" == "1" ]; then
-    python ./src/train_stage_1.py -b=${batch_size} -n=${exp_name} -t=${step} -card=${card}
+    python ./src/train_stage_1.py -b ${batch_size} -n ${exp_name} -t ${step} -card ${card}
 elif [ "$TASK_NAME" == "2" ]; then
-    python ./src/train_stage_2.py -b=${batch_size} -n=${exp_name} -a=${actor} -c=${critic} -e=${step} -card=${card} -num_images_per_prompt=${num_images_per_prompt}
+    python ./src/train_stage_2.py -b ${batch_size} -n ${exp_name} -a ${actor} -c ${critic} -e ${step} -card ${card} -num_images_per_prompt ${num_images_per_prompt}
 fi
 #source run.sh 1
 #torchrun --standalone --nproc_per_node=1 ./src/train_stage_${TASK_NAME}.py
