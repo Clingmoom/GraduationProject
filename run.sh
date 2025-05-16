@@ -5,7 +5,7 @@ if [ -z "$1" ]; then
     echo "❌ 错误：必须传入任务名（如 [1|2]"
     exit 1
 fi
-
+TASK_NAME="$1"
 # 🎯 参数解析（根据任务名设置默认值）
 if [ "$TASK_NAME" == "1" ]; then
     batch_size=2
@@ -47,5 +47,5 @@ if [ "$TASK_NAME" == "1" ]; then
 elif [ "$TASK_NAME" == "2" ]; then
     python ./src/train_stage_2.py -b=${batch_size} -n=${exp_name} -a=${actor} -c=${critic} -e=${step} -card=${card} -num_images_per_prompt=${num_images_per_prompt}
 fi
-source run.sh 1
+#source run.sh 1
 #torchrun --standalone --nproc_per_node=1 ./src/train_stage_${TASK_NAME}.py
