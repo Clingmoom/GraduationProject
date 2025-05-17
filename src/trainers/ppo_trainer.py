@@ -32,7 +32,7 @@ class PPOTrainer(Trainer):
     ) -> None:
         super().__init__()
         self.cfg = cfg
-        self.run_name = f"ppo_{cfg.exp_name}_{datetime.now().strftime('%m%d%H')}"
+        self.run_name = f"{cfg.exp_name}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         print(f"self.run_name:{self.run_name}")
         self.device = device
         self.max_new_tokens = 77
@@ -100,7 +100,7 @@ class PPOTrainer(Trainer):
 
         self.step=0
 
-        self.writer = SummaryWriter(f"./runs/{self.run_name}/logs", max_queue=50)
+        self.writer = SummaryWriter(f"./logs/{self.run_name}", max_queue=50)
         self.total_epochs = cfg.total_epochs
         self.debug = False
         self.save_freq = 1000

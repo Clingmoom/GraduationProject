@@ -2,7 +2,7 @@
 
 # ✅ 强制要求第一个参数存在（任务名）
 if [ -z "$1" ]; then
-    echo "❌ 错误：必须传入任务名（如 [1|2]"
+    echo "❌ 错误：必须传入任务名（如 [sft|ppo|test]"
     exit 1
 fi
 
@@ -19,19 +19,26 @@ git reset --hard origin/$BRANCH_NAME || {
     echo "❌ 分支不存在：origin/$BRANCH_NAME"
     exit 1
 }
-
 TASK_NAME=$1
+
+echo "启动本任务的TensorBoard"
+ps -ef | grep tensorboard | awk '{print $2}' | xargs kill -9
+mkdir -p ./logs
+tensorboard --port 6007 --logdir "./logs"
+
 shift  # 去掉第一个参数，剩下的全是给 Python 的参数
 
-echo "🚀 正在运行任务：train_stage_$TASK_NAME"
+echo "🚀 正在运行任务：$TASK_NAME _train"
 
-if [ "$TASK_NAME" == "1" ]; then
+if [ "$TASK_NAME" == "sft" ]; then
     python ./src/train_stage_1.py "$@"
-elif [ "$TASK_NAME" == "2" ]; then
+elif [ "$TASK_NAME" == "ppo" ]; then
     python ./src/train_stage_2.py "$@"
 else
-    echo "❌ 错误：未知任务名 $TASK_NAME，只支持 1 或 2"
+    echo "❌ 错误：未知任务名 $TASK_NAME，只支持 [sft|ppo|test]"
     exit 1
 fi
-#source run.sh 1
+
+
+#source run.sh [sft|ppo|test]
 #torchrun --standalone --nproc_per_node=1 ./src/train_stage_${TASK_NAME}.py

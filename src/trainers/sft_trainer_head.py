@@ -19,9 +19,7 @@ class SFTTrainer_head(Trainer):
     ) -> None:
         super().__init__()
         self.cfg = cfg
-        self.run_name = (
-            f"sft_{cfg.exp_name}_{datetime.now().strftime('%m%d%H%M')}"  # %Y%m%d%H%M
-        )
+        self.run_name = f"{cfg.exp_name}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         print(f"self.run_name:{self.run_name}")
         self.device = device
         self.max_steps = cfg.max_steps
@@ -67,7 +65,7 @@ class SFTTrainer_head(Trainer):
         # 记录训练日志  max_queue：攒够这么多条才写入文件
         # 查看本地日志：tensorboard --logdir=./runs
         # TODO：自动 flush() ；根据 batch size 自动调整 max_queue
-        writer = SummaryWriter(f"./runs/{self.run_name}/logs", max_queue=40)
+        writer = SummaryWriter(f"./logs/{self.run_name}", max_queue=40)
         scaler = GradScaler(enabled = self.dtype != torch.float32)  # 混合精度训练
 
         opt_model.train()  # 训练模式

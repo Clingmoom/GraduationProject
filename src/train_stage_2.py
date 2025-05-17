@@ -37,7 +37,7 @@ def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_
 
 @click.command()
 @click.option('--batch-size', '-b', default = 2)
-@click.option('--exp-name', '-n', default = "default")
+@click.option('--exp-name', '-n', default = "ppo")
 @click.option('--actor', '-a', default = "./runs/stage1_step.pt")
 @click.option('--critic', '-c', default = "./runs/stage1_step.pt")
 @click.option('--epoch', '-e', default = 1)

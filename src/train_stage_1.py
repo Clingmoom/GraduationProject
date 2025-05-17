@@ -26,7 +26,7 @@ def train(batch_size, exp_name, step, card):
 
 @click.command()
 @click.option('--batch-size', '-b', default=1)
-@click.option('--exp-name', '-n', default="default")
+@click.option('--exp-name', '-n', default="sft")
 @click.option('--step', '-t', default=5e5)
 @click.option('--card', '-card', default=0)
 
