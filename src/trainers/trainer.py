@@ -26,8 +26,8 @@ class Trainer:
         with open(f"./runs/{self.run_name}/metrics.json", "w") as fp:
             json.dump(metrics, fp, indent=4)
 
-    def save_states(self, step, is_last=False):
-        save_dir = ROOT_DIR / "ckpt" / "test" / f"{self.run_name}"
+    def save_states(self, step = None, is_last=False):
+        save_dir = ROOT_DIR / "ckpt" / "train" / f"{self.run_name}"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         # 根据是否为最后一步确定保存的文件名

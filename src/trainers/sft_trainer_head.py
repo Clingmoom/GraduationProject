@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime
 from torch import nn
 from torch.utils.data import DataLoader
-from torch.cuda.amp.grad_scaler import GradScaler
+from torch.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from src.configs import TrainingConfig
 from .trainer import Trainer
@@ -19,13 +19,12 @@ class SFTTrainer_head(Trainer):
     ) -> None:
         super().__init__()
         self.cfg = cfg
-        self.run_name = (
-            f"sft_{cfg.exp_name}_{datetime.now().strftime('%m%d%H%M')}"  # %Y%m%d%H%M
-        )
+        self.run_name = f"{cfg.exp_name}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         print(f"self.run_name:{self.run_name}")
         self.device = device
         self.max_steps = cfg.max_steps
         self.save_freq = 2e4  # 模型保存频率
+        self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.train_dataloader = iter(DataLoader(
             train_dataset,
@@ -67,7 +66,7 @@ class SFTTrainer_head(Trainer):
         # 记录训练日志  max_queue：攒够这么多条才写入文件
         # 查看本地日志：tensorboard --logdir=./runs
         # TODO：自动 flush() ；根据 batch size 自动调整 max_queue
-        writer = SummaryWriter(f"./runs/{self.run_name}/logs", max_queue=40)
+        writer = SummaryWriter(f"./logs/{self.run_name}", max_queue=40)
         scaler = GradScaler(enabled = self.dtype != torch.float32)  # 混合精度训练
 
         opt_model.train()  # 训练模式
@@ -80,7 +79,7 @@ class SFTTrainer_head(Trainer):
             y = y.to(self.device)  # y是x的下一个token
 
             # 自动混合精度
-            with torch.autocast(device_type="cuda", dtype=self.dtype):
+            with torch.autocast(device_type=self.device_type, dtype=self.dtype):
                 y_hat, diffw, diffstep = opt_model(x) # (B,T,V)
                 loss = self.criterion(y_hat, y)
                 loss_w = self.criterion(diffw, self.generate_tensor(2, [0, 1, 2, 3, 4], y.shape).long())
@@ -117,4 +116,4 @@ class SFTTrainer_head(Trainer):
 
             step += 1
         # 最终保存模型
-        self.save_states(step, True)
+        self.save_states(is_last=True)

@@ -8,12 +8,12 @@ from datetime import datetime
 from typing import cast, Tuple
 from torch.utils.data import DataLoader
 from transformers import GPT2Tokenizer
-from torch.cuda.amp.grad_scaler import GradScaler
+from torch.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
 from .trainer import Trainer
 from .experience import Experience
-from src.configs import TrainingConfig
+from src.configs import TrainingConfig, ROOT_DIR
 from src.models import GPTActor, GPTCritic
 from src.loss import ValueLoss, PolicyLoss
 from .prompt_scorer import PromptScorer
@@ -32,9 +32,10 @@ class PPOTrainer(Trainer):
     ) -> None:
         super().__init__()
         self.cfg = cfg
-        self.run_name = f"ppo_{cfg.exp_name}_{datetime.now().strftime('%m%d%H')}"
+        self.run_name = f"{cfg.exp_name}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         print(f"self.run_name:{self.run_name}")
         self.device = device
+        self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.max_new_tokens = 77
         self.pattern = r'\[([^]]*):0-1:1\.0\]'#r'\[(\s*\w+):0-1:1\.0\]'
 
@@ -100,7 +101,7 @@ class PPOTrainer(Trainer):
 
         self.step=0
 
-        self.writer = SummaryWriter(f"./runs/{self.run_name}/logs", max_queue=50)
+        self.writer = SummaryWriter(f"./logs/{self.run_name}", max_queue=50)
         self.total_epochs = cfg.total_epochs
         self.debug = False
         self.save_freq = 1000
@@ -380,34 +381,34 @@ class PPOTrainer(Trainer):
         )
 
     def save_states(self,
-        step,
+        step = None,
         is_last=False
     ):
+        save_dir = ROOT_DIR / "ckpt" / "train" / f"{self.run_name}"
         file_name = (
-            "actor_final.pt"
-            if is_last
-            else f"actor_step{step}.pt"
+            "actor_final.pt" if is_last else f"actor_step{step}.pt"
         )
+        save_path = save_dir / file_name
         torch.save(
             {
                 "step": step,
                 "model_state_dict": self.orig_actor.state_dict(),  # Save the unoptimized model
                 "optimizer_state_dict": self.actor_optimizer.state_dict(),
             },
-            f"./runs/{self.run_name}/{file_name}",
+            save_path
         )
+
         file_name = (
-            f"critic_final.pt"
-            if is_last
-            else f"critic_step{step}.pt"
+            f"critic_final.pt" if is_last else f"critic_step{step}.pt"
         )
+        save_path = save_dir / file_name
         torch.save(
             {
                 "step": step,
                 "model_state_dict": self.orig_critic.state_dict(),
                 "optimizer_state_dict": self.critic_optimizer.state_dict(),
             },
-            f"./runs/{self.run_name}/{file_name}",
+            save_path
         )
 
     def fit(self):
@@ -441,10 +442,10 @@ class PPOTrainer(Trainer):
                     print("input_lengths", input_lengths)
                     print("prompt after", prompt.shape)
 
-                total_steps = step + epoch * len(self.train_dataloader)
+                total_steps = step + epoch * len(self.train_dataloader) # 数据量//batch_size
 
                 # 混合精度训练
-                with torch.autocast(device_type = "cuda", dtype = self.dtype, enabled = self.dtype != torch.float32):
+                with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
                     experience = self.make_experience(prompt, input_masks, input_lengths)
                     # 策略网络更新
                     self.actor.train()
@@ -526,5 +527,5 @@ class PPOTrainer(Trainer):
                 if ((total_steps == 500 or (total_steps != 0 and total_steps % self.save_freq == 0))):
                     self.save_states(total_steps)
 
-        self.save_states(None, True)
+        self.save_states(is_last=True)
 
