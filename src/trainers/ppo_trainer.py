@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from .trainer import Trainer
 from .experience import Experience
-from src.configs import TrainingConfig
+from src.configs import TrainingConfig, ROOT_DIR
 from src.models import GPTActor, GPTCritic
 from src.loss import ValueLoss, PolicyLoss
 from .prompt_scorer import PromptScorer
@@ -381,34 +381,34 @@ class PPOTrainer(Trainer):
         )
 
     def save_states(self,
-        step,
+        step = None,
         is_last=False
     ):
+        save_dir = ROOT_DIR / "ckpt" / "train" / f"{self.run_name}"
         file_name = (
-            "actor_final.pt"
-            if is_last
-            else f"actor_step{step}.pt"
+            "actor_final.pt" if is_last else f"actor_step{step}.pt"
         )
+        save_path = save_dir / file_name
         torch.save(
             {
                 "step": step,
                 "model_state_dict": self.orig_actor.state_dict(),  # Save the unoptimized model
                 "optimizer_state_dict": self.actor_optimizer.state_dict(),
             },
-            f"./runs/{self.run_name}/{file_name}",
+            save_path
         )
+
         file_name = (
-            f"critic_final.pt"
-            if is_last
-            else f"critic_step{step}.pt"
+            f"critic_final.pt" if is_last else f"critic_step{step}.pt"
         )
+        save_path = save_dir / file_name
         torch.save(
             {
                 "step": step,
                 "model_state_dict": self.orig_critic.state_dict(),
                 "optimizer_state_dict": self.critic_optimizer.state_dict(),
             },
-            f"./runs/{self.run_name}/{file_name}",
+            save_path
         )
 
     def fit(self):
@@ -442,7 +442,7 @@ class PPOTrainer(Trainer):
                     print("input_lengths", input_lengths)
                     print("prompt after", prompt.shape)
 
-                total_steps = step + epoch * len(self.train_dataloader)
+                total_steps = step + epoch * len(self.train_dataloader) # 数据量//batch_size
 
                 # 混合精度训练
                 with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
@@ -527,5 +527,5 @@ class PPOTrainer(Trainer):
                 if ((total_steps == 500 or (total_steps != 0 and total_steps % self.save_freq == 0))):
                     self.save_states(total_steps)
 
-        self.save_states(None, True)
+        self.save_states(is_last=True)
 

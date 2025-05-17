@@ -116,4 +116,4 @@ class SFTTrainer_head(Trainer):
 
             step += 1
         # 最终保存模型
-        self.save_states(step, True)
+        self.save_states(is_last=True)
