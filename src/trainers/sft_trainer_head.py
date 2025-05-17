@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime
 from torch import nn
 from torch.utils.data import DataLoader
-from torch.cuda.amp.grad_scaler import GradScaler
+from torch.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from src.configs import TrainingConfig
 from .trainer import Trainer
@@ -24,6 +24,7 @@ class SFTTrainer_head(Trainer):
         self.device = device
         self.max_steps = cfg.max_steps
         self.save_freq = 2e4  # 模型保存频率
+        self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.train_dataloader = iter(DataLoader(
             train_dataset,
@@ -78,7 +79,7 @@ class SFTTrainer_head(Trainer):
             y = y.to(self.device)  # y是x的下一个token
 
             # 自动混合精度
-            with torch.autocast(device_type="cuda", dtype=self.dtype):
+            with torch.autocast(device_type=self.device_type, dtype=self.dtype):
                 y_hat, diffw, diffstep = opt_model(x) # (B,T,V)
                 loss = self.criterion(y_hat, y)
                 loss_w = self.criterion(diffw, self.generate_tensor(2, [0, 1, 2, 3, 4], y.shape).long())

@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import cast, Tuple
 from torch.utils.data import DataLoader
 from transformers import GPT2Tokenizer
-from torch.cuda.amp.grad_scaler import GradScaler
+from torch.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
 from .trainer import Trainer
@@ -35,6 +35,7 @@ class PPOTrainer(Trainer):
         self.run_name = f"{cfg.exp_name}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         print(f"self.run_name:{self.run_name}")
         self.device = device
+        self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.max_new_tokens = 77
         self.pattern = r'\[([^]]*):0-1:1\.0\]'#r'\[(\s*\w+):0-1:1\.0\]'
 
@@ -444,7 +445,7 @@ class PPOTrainer(Trainer):
                 total_steps = step + epoch * len(self.train_dataloader)
 
                 # 混合精度训练
-                with torch.autocast(device_type = "cuda", dtype = self.dtype, enabled = self.dtype != torch.float32):
+                with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
                     experience = self.make_experience(prompt, input_masks, input_lengths)
                     # 策略网络更新
                     self.actor.train()
