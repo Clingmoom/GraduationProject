@@ -22,9 +22,9 @@ git reset --hard origin/$BRANCH_NAME || {
 TASK_NAME=$1
 
 echo "启动本任务的TensorBoard"
-ps -ef | grep tensorboard | awk '{print $2}' | xargs kill -9
+ps -ef | grep tensorboard | grep -v grep | awk '{print $2}' | xargs -r kill -9 2>/dev/null
 mkdir -p ./logs
-tensorboard --port 6007 --logdir "./logs" --bind_all
+tensorboard --port 6007 --logdir "./logs" --bind_all > /dev/null 2>&1 &
 
 shift  # 去掉第一个参数，剩下的全是给 Python 的参数
 
