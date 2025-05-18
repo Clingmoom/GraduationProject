@@ -40,7 +40,7 @@ def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_
 
 
 @click.command()
-@click.option('--batch-size', '-b', default = 2)
+@click.option('--batch-size', '-b', default = 3)
 @click.option('--exp-name', '-n', default = "ppo")
 @click.option('--actor', '-a', default = "./ckpt/train/sft_20250517-155945/final.pt")
 @click.option('--critic', '-c', default = "./ckpt/train/sft_20250517-155945/final.pt")

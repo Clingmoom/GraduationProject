@@ -260,7 +260,7 @@ class PPOTrainer(Trainer):
         return penalized_reward, estimated_kl
 
     @torch.no_grad()
-    def make_experience(self, idx, input_masks, input_lengths):
+    def make_experience(self, prompt, input_masks, input_lengths):
         # self.reward_model.eval()
         self.sft_model.eval()
         self.actor.eval()
@@ -272,7 +272,7 @@ class PPOTrainer(Trainer):
             diffw_list,
             diffstep_list
         ) = self.actor.batch_generate(
-            idx,
+            prompt,
             input_masks,
             input_lengths,
             self.max_new_tokens,
@@ -283,12 +283,12 @@ class PPOTrainer(Trainer):
 
         if self.debug:
             print(" --- Make Experience --- ")
-            print("completion", completion.shape)
-            print("input_masks", input_masks.shape)
-            print("num_actions", num_actions)
-            print("action_mask", action_mask.shape)
-            print("idx", idx.shape)
-            print("input_masks", input_masks.shape)
+            print("completion", completion.shape) # torch.Size([2, 85])
+            print("attention_mask", attention_mask.shape)
+            print("num_actions", num_actions) # 23
+            print("action_mask", action_mask.shape) # torch.Size([2, 23])
+            print("prompt", prompt.shape) # torch.Size([2, 62])
+            print("input_masks", input_masks.shape) # torch.Size([2, 77])
 
         #计算生成文本的动作log概率
         actor_log_probs, w_log_probs, step_log_probs = self.actor.forward_actor(
@@ -341,10 +341,10 @@ class PPOTrainer(Trainer):
         reward = self.scorer.get_score_batched(prompts = output_prompt, plain_texts = input_prompt).unsqueeze(1) # (B, 1)
 
         if self.debug:
-            print("actor_log_probs", actor_log_probs.shape)
-            print("sft_log_probs", sft_log_probs.shape)
-            print("values", values.shape)
-            print("reward", reward.shape)
+            print("actor_log_probs", actor_log_probs.shape) # torch.Size([2, 23])
+            print("sft_log_probs", sft_log_probs.shape) # torch.Size([2, 23])
+            print("values", values.shape) # torch.Size([2, 1])
+            print("reward", reward.shape) # torch.Size([2, 1])
 
         kl_penalized_reward, estimated_kl = self.kl_penalized_reward(reward, actor_log_probs, sft_log_probs)
         w_kl_penalized_reward, w_estimated_kl = self.kl_penalized_reward(reward, w_log_probs, sft_w_log_probs)
@@ -354,13 +354,13 @@ class PPOTrainer(Trainer):
         w_advantage = w_kl_penalized_reward - values
         step_advantage = step_kl_penalized_reward - values
 
-        # advantage normalization ~ 标准化
-        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
-        w_advantage = (w_advantage - w_advantage.mean()) / (w_advantage.std() + 1e-8)
-        step_advantage = (step_advantage - step_advantage.mean()) / (step_advantage.std() + 1e-8)
+        # # advantage normalization ~ 标准化
+        # advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
+        # w_advantage = (w_advantage - w_advantage.mean()) / (w_advantage.std() + 1e-8)
+        # step_advantage = (step_advantage - step_advantage.mean()) / (step_advantage.std() + 1e-8)
 
         if self.debug:
-            print("kl_penalized_reward", kl_penalized_reward)
+            print("kl_penalized_reward", kl_penalized_reward) # tensor([[5.7218],[4.0584]], device='cuda:0')
             print("advantage", advantage.shape) #[B, 1]
 
         return Experience(
@@ -428,7 +428,7 @@ class PPOTrainer(Trainer):
                 step = step + self.step
                 if len(prompt.shape) == 3:
                     prompt = prompt.squeeze(1)
-                    input_masks = input_masks.squeeze(1)
+                    input_masks = input_masks.squeeze(1) # (2, 77)
 
                 prompt, input_masks, input_lengths = (
                     prompt.to(self.device),
@@ -437,16 +437,17 @@ class PPOTrainer(Trainer):
                 )
 
                 if self.debug:
-                    print("prompt", prompt.shape)
+                    print(" --- Fit load prompt --- ")
+                    print("prompt", prompt.shape) # torch.Size([2, 77])
 
-                real_input_length = torch.max(input_lengths)
-                prompt = prompt[:, :real_input_length] # 截断到实际长度
+                max_input_length = torch.max(input_lengths)
+                prompt = prompt[:, :max_input_length]
 
                 if self.debug:
-                    print("input_lengths", input_lengths)
-                    print("prompt after", prompt.shape)
+                    print("input_lengths", input_lengths) # tensor([62, 58], device='cuda:0')
+                    print("prompt after cut", prompt.shape) # torch.Size([2, 62])
 
-                total_steps = step + epoch * len(self.train_dataloader) # 数据量//batch_size
+                total_steps = step + epoch * len(self.train_dataloader) # 数据量//batch_size 225000
 
                 # 混合精度训练
                 with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
@@ -460,8 +461,9 @@ class PPOTrainer(Trainer):
                     )
 
                     if self.debug:
-                        print("curr_actor_log_probs", curr_actor_log_probs.shape)
-                        print("actor_log_probs", experience.actor_log_probs.shape)
+                        print(" --- Training actor update --- ")
+                        print("curr_actor_log_probs", curr_actor_log_probs.shape) #  torch.Size([2, 23])
+                        print("actor_log_probs", experience.actor_log_probs.shape) # torch.Size([2, 23])
 
                     actor_loss_token = self.actor_criterion(
                         curr_actor_log_probs,
@@ -497,8 +499,9 @@ class PPOTrainer(Trainer):
                     ).view(-1, 1)
 
                     if self.debug:
-                        print("new_value", new_values.shape)
-                        print("reward", experience.kl_penalized_reward.shape)
+                        print(" --- Training critic update --- ")
+                        print("new_value", new_values.shape) # torch.Size([2, 1])
+                        print("reward", experience.kl_penalized_reward.shape) # torch.Size([2, 1])
 
                     critic_loss = self.critic_criterion(
                         new_values,
