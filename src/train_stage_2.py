@@ -5,6 +5,10 @@ from src.data import PPO_Dataset
 from src.trainers import PPOTrainer
 
 
+# 内存碎片优化
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_images_per_prompt):
     cfg = get_configs("gpt2-medium")
     device = f"cuda:{card}"
