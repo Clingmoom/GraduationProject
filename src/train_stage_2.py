@@ -5,6 +5,10 @@ from src.data import PPO_Dataset
 from src.trainers import PPOTrainer
 
 
+# 内存碎片优化
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_images_per_prompt):
     cfg = get_configs("gpt2-medium")
     device = f"cuda:{card}"
@@ -17,7 +21,7 @@ def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_
 
     cfg.sft_model_weights = cfg.actor_weights
     cfg.reward_model_weights = cfg.critic_weights
-
+    print("正在加载模型权重……")
     actor = GPTActor.from_checkpoint(cfg, cfg.actor_weights)
     actor.to(device)
 
@@ -36,7 +40,7 @@ def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_
 
 
 @click.command()
-@click.option('--batch-size', '-b', default = 2)
+@click.option('--batch-size', '-b', default = 3)
 @click.option('--exp-name', '-n', default = "ppo")
 @click.option('--actor', '-a', default = "./ckpt/train/sft_20250517-155945/final.pt")
 @click.option('--critic', '-c', default = "./ckpt/train/sft_20250517-155945/final.pt")
