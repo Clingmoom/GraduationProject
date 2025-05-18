@@ -400,7 +400,7 @@ class PPOTrainer(Trainer):
             },
             save_path
         )
-
+        print(f"✅ 模型已保存至 {save_path}，step={step}")
         file_name = (
             f"critic_final.pt" if is_last else f"critic_step{step}.pt"
         )
@@ -413,6 +413,7 @@ class PPOTrainer(Trainer):
             },
             save_path
         )
+        print(f"✅ 模型已保存至 {save_path}，step={step}")
 
     def fit(self):
         scaler = GradScaler(enabled = self.dtype != torch.float32)

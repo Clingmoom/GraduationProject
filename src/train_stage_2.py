@@ -21,7 +21,7 @@ def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_
 
     cfg.sft_model_weights = cfg.actor_weights
     cfg.reward_model_weights = cfg.critic_weights
-
+    print("正在加载模型权重……")
     actor = GPTActor.from_checkpoint(cfg, cfg.actor_weights)
     actor.to(device)
 
