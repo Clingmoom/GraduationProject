@@ -104,7 +104,7 @@ class PPOTrainer(Trainer):
 
         self.writer = SummaryWriter(f"./logs/{self.run_name}", max_queue=50)
         self.total_epochs = cfg.total_epochs
-        self.debug = True
+        self.debug = False
         self.save_freq = 1000
         self.dtype = torch.float16
 
