@@ -1,3 +1,4 @@
+import os
 import re
 import torch
 import torch.optim as optim
@@ -41,12 +42,12 @@ class PPOTrainer(Trainer):
 
         self.orig_actor = actor
         self.orig_critic = critic
-        #self.orig_sft_model = sft_model
-        self.sft_model = sft_model
+        self.orig_sft_model = sft_model
+        # self.sft_model = sft_model
 
         self.actor = cast(GPTActor, torch.compile(self.orig_actor)) # 策略网络（生成文本）
         self.critic = cast(GPTCritic, torch.compile(self.orig_critic)) # 评价网络
-        #self.sft_model = cast(GPTActor, torch.compile(self.orig_sft_model)) # 参考网络
+        self.sft_model = cast(GPTActor, torch.compile(self.orig_sft_model)) # 参考网络
 
         # 初始化评分器 （基于StableDiffusion生成图片后的PickScore+CLIP+Aesthetic）
         self.scorer =PromptScorer(device=device, num_images_per_prompt=num_images_per_prompt)
@@ -103,7 +104,7 @@ class PPOTrainer(Trainer):
 
         self.writer = SummaryWriter(f"./logs/{self.run_name}", max_queue=50)
         self.total_epochs = cfg.total_epochs
-        self.debug = False
+        self.debug = True
         self.save_freq = 1000
         self.dtype = torch.float16
 
@@ -385,6 +386,8 @@ class PPOTrainer(Trainer):
         is_last=False
     ):
         save_dir = ROOT_DIR / "ckpt" / "train" / f"{self.run_name}"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
         file_name = (
             "actor_final.pt" if is_last else f"actor_step{step}.pt"
         )
