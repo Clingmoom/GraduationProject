@@ -15,17 +15,15 @@ from ..configs import ROOT_DIR
 class PromptScorer:
     def __init__(self , device, num_images_per_prompt=2, seed=None):
         # init scorer hparams
-        self.lambda_aes = 0.05
-        self.lambda_clip = 5.0
+
         self.num_images_per_prompt = num_images_per_prompt
         self.seed =seed
         # init models
         self.device = device
         self.init_clip_model()
         self.init_aesthetic_model()
-        self.diffusion_pipe = None  # 延迟初始化
         self.init_pickscore_model()
-
+        self.init_diffusion_model()
         self.eval_data_res = []
 
     def init_pickscore_model(self):
@@ -54,7 +52,7 @@ class PromptScorer:
 
         pipe = StableDiffusionDynamicPromptPipeline.from_pretrained(
             self.sdmodel_name,
-            # revision="fp16",
+            variant="fp16",
             torch_dtype=torch.float16,
             scheduler=dpm_scheduler,
         )
@@ -198,8 +196,6 @@ class PromptScorer:
         return images
 
     def get_score_batched(self, prompts, plain_texts, plain_aes_score=None):
-        if self.diffusion_pipe is None:
-            self.init_diffusion_model()  # 延迟加载（仅第一次）
 
         images = self.gen_image_batched(prompts)
         image_features = self.get_clip_features(images, is_batched=True)

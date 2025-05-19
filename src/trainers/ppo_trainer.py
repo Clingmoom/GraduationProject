@@ -91,13 +91,13 @@ class PPOTrainer(Trainer):
         self.actor_optimizer = optim.Adam(
             self.actor.parameters(),
             lr=cfg.actor_lr,
-            betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
+            betas=(self.cfg.adam_beta1, self.cfg.adam_beta1),
         )
 
         self.critic_optimizer = optim.Adam(
             self.critic.parameters(),
             lr=cfg.critic_lr,
-            betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
+            betas=(self.cfg.adam_beta1, self.cfg.adam_beta1),
         )
 
         self.step=0
@@ -122,110 +122,180 @@ class PPOTrainer(Trainer):
         self.save_hyperparams(hp)
         print("Initialized PPO Trainer")
 
-    def trans_token(self, bef_list, diffw_list, diffstep_list):
+    def trans_token(self,bef_list,diffw_list,diffstep_list):
         '''
-        将原始 token 序列转换为带动态参数格式
-        例：[house] -> [house:0-1:1.0]
-        插入逻辑：根据 diffw/diffstep 统计结果选择最优参数
+        将原始token序列转换为包含动态参数的格式
+        示例转换：[house] -> [house:0-1:1.0]
+        实现动态提示参数的插入逻辑
+        根据diffw/diffstep统计结果选择最优参数组合
         '''
-        if len(bef_list) == 0:
+        if len(bef_list)==0:
             return bef_list
-        aft_list = torch.tensor([], device=bef_list.device)
-        ind = 0
+        aft_list=torch.tensor([],device=bef_list.device)
+
+        ind=0
         token = bef_list[ind]
-
-        def get_modes(special_token_ind_list):
-            """根据 special token 索引计算 diffw 和 diffstep 的 mode"""
-            try:
-                w_counts = torch.bincount(diffw_list[special_token_ind_list])
-                w_mode = int(torch.argmax(w_counts).item())
-            except (RuntimeError, ValueError, IndexError):
-                w_mode = 2
-            try:
-                counts = torch.bincount(diffstep_list[special_token_ind_list])
-                mode = int(torch.argmax(counts).item())
-            except (RuntimeError, ValueError, IndexError):
-                mode = 1
-            return w_mode, mode
-
-        def insert_special_tokens(special_token_ind_list, w_mode, mode):
-            """根据 mode 和 w_mode 插入动态 token 格式"""
-            for idx in special_token_ind_list:
-                s_token = bef_list[idx]
-                aft_list_local = torch.cat([
-                    self.token_dict["["].unsqueeze(0),
-                    s_token.unsqueeze(0),
-                    self.token_dict[":"].unsqueeze(0),
-                    self.step_dict[mode],
-                    self.token_dict[":"].unsqueeze(0),
-                    self.w_dict[w_mode],
-                    self.token_dict["]"].unsqueeze(0)
-                ])
-                nonlocal aft_list
-                aft_list = torch.cat([aft_list, aft_list_local])
-
-        if not (token == self.token_dict[","] or token == self.token_dict["."]):
-            # --- 处理开头非逗号句号的情况 ---
-            while not (token == self.token_dict[","] or token == self.token_dict["."] or token == self.token_dict[" "]):
+        if not (token==self.token_dict[","] or token==self.token_dict["."]):
+            # 如果不是逗号或句号 直接添加到aft_list，直到出现逗号、句号、空格
+            while not (token==self.token_dict[","] or token==self.token_dict["."] or token==self.token_dict[" "]):
                 token = bef_list[ind]
-                aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-                ind += 1
-                if ind >= len(bef_list):
+                aft_list=torch.cat([aft_list,token.unsqueeze(0)])
+                ind+=1
+                if ind>=(len(bef_list)):
                     break
-            if ind < len(bef_list):
+            if ind<(len(bef_list)):
                 token = bef_list[ind]
-
+            # 获取特殊token的索引
             special_token_ind_list = []
-            while ind < len(bef_list) and not (
-                    token == self.token_dict[","] or token == self.token_dict["."] or self.tokenizer.decode(
-                    [token.long()]).startswith(" ")):
-                if token == self.token_dict[" "]:
-                    aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-                    ind += 1
-                    if ind >= len(bef_list):
+            while ind<(len(bef_list)) and  not (token==self.token_dict[","] or token==self.token_dict["."] or self.tokenizer.decode([token.long()]).startswith(" ")):
+
+                if token==self.token_dict[" "]:
+                    aft_list=torch.cat([aft_list,token.unsqueeze(0)])
+                    ind+=1
+                    if ind>=(len(bef_list)):
                         break
                     token = bef_list[ind]
                 else:
                     special_token_ind_list.append(ind)
-                    ind += 1
-                    if ind >= len(bef_list):
+
+                    ind+=1
+                    if ind>=(len(bef_list)):
                         break
                     token = bef_list[ind]
-                    if token == self.token_dict[","] or token == self.token_dict["."]:
+
+
+                    if token==self.token_dict[","] or token==self.token_dict["."]:
                         break
 
-            w_mode, mode = get_modes(special_token_ind_list)
-            insert_special_tokens(special_token_ind_list, w_mode, mode)
-            ind += 1
 
-        # --- 开始统一处理后续所有 token ---
-        while ind < len(bef_list):
-            token = bef_list[ind]
 
-            if not (token == self.token_dict[","] or token == self.token_dict["."]):
-                aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-                ind += 1
-            else:
-                ind += 1
-                if ind >= len(bef_list):
-                    break
+            try:
+                w_counts = torch.bincount(diffw_list[special_token_ind_list])
+                w_mode=int(torch.argmax(w_counts).item())
+            except:
+                w_mode=2
+
+            try:
+                counts = torch.bincount(diffstep_list[special_token_ind_list])
+                mode=int(torch.argmax(counts).item())
+            except:
+                mode=1
+
+
+            for ind in special_token_ind_list:
+                aft_list=torch.cat([aft_list,self.token_dict["["].unsqueeze(0)])
+                s_token = bef_list[ind]
+                aft_list=torch.cat([aft_list,s_token.unsqueeze(0)])
+                aft_list=torch.cat([aft_list,self.token_dict[":"].unsqueeze(0)])
+                aft_list=torch.cat([aft_list,self.step_dict[mode]])
+                aft_list=torch.cat([aft_list,self.token_dict[":"].unsqueeze(0)])
+                aft_list=torch.cat([aft_list,self.w_dict[w_mode]])
+                aft_list=torch.cat([aft_list,self.token_dict["]"].unsqueeze(0)])
+            ind+=1
+
+            while ind < len(bef_list):
+
                 token = bef_list[ind]
 
-                special_token_ind_list = []
-                while not (token == self.token_dict[","] or token == self.token_dict["."]):
-                    special_token_ind_list.append(ind)
-                    ind += 1
+                if not (token==self.token_dict[","] or token==self.token_dict["."]):
+                    aft_list=torch.cat([aft_list,token.unsqueeze(0)])
+                    ind+=1
+                else:
+                    ind+=1
                     if ind >= len(bef_list):
                         break
                     token = bef_list[ind]
-                    if token == self.token_dict[","] or token == self.token_dict["."]:
+                    special_token_ind_list=[]
+                    while not (token==self.token_dict[","] or token==self.token_dict["."]):
+                        special_token_ind_list.append(ind)
+                        ind+=1
+                        if ind>=(len(bef_list)):
+                            break
+                        token = bef_list[ind]
+
+                        if token==self.token_dict[","] or token==self.token_dict["."]:
+                            break
+
+
+                    aft_list=torch.cat([aft_list,self.token_dict[","].unsqueeze(0)])
+
+                    try:
+                        w_counts = torch.bincount(diffw_list[special_token_ind_list])
+                        w_mode=int(torch.argmax(w_counts).item())
+                    except:
+                        w_mode=2
+
+                    try:
+                        counts = torch.bincount(diffstep_list[special_token_ind_list])
+                        mode=int(torch.argmax(counts).item())
+                    except:
+                        mode=1
+
+
+                    for ind in special_token_ind_list:
+                        aft_list=torch.cat([aft_list,self.token_dict["["].unsqueeze(0)])
+                        s_token = bef_list[ind]
+                        aft_list=torch.cat([aft_list,s_token.unsqueeze(0)])
+                        aft_list=torch.cat([aft_list,self.token_dict[":"].unsqueeze(0)])
+                        aft_list=torch.cat([aft_list,self.step_dict[mode]])
+                        aft_list=torch.cat([aft_list,self.token_dict[":"].unsqueeze(0)])
+                        aft_list=torch.cat([aft_list,self.w_dict[w_mode]])
+                        aft_list=torch.cat([aft_list,self.token_dict["]"].unsqueeze(0)])
+                    ind+=1
+
+
+        else:
+            while ind < len(bef_list):
+
+                token = bef_list[ind]
+
+                if not (token==self.token_dict[","] or token==self.token_dict["."]):
+                    aft_list=torch.cat([aft_list,token.unsqueeze(0)])
+                    ind+=1
+                else:
+                    ind+=1
+                    if ind >= len(bef_list):
                         break
+                    token = bef_list[ind]
+                    special_token_ind_list=[]
+                    while not (token==self.token_dict[","] or token==self.token_dict["."]):
+                        special_token_ind_list.append(ind)
+                        ind+=1
+                        if ind>=(len(bef_list)):
+                            break
+                        token = bef_list[ind]
 
-                aft_list = torch.cat([aft_list, self.token_dict[","].unsqueeze(0)])
 
-                w_mode, mode = get_modes(special_token_ind_list)
-                insert_special_tokens(special_token_ind_list, w_mode, mode)
-                ind += 1
+                        if token==self.token_dict[","] or token==self.token_dict["."]:
+                            break
+
+                    aft_list=torch.cat([aft_list,self.token_dict[","].unsqueeze(0)])
+
+                    try:
+                        w_counts = torch.bincount(diffw_list[special_token_ind_list])
+                        w_mode=int(torch.argmax(w_counts).item())
+                    except:
+                        w_mode=2
+
+                    try:
+                        counts = torch.bincount(diffstep_list[special_token_ind_list])
+                        mode=int(torch.argmax(counts).item())
+                    except:
+                        mode=1
+
+
+                    for ind in special_token_ind_list:
+
+                        aft_list=torch.cat([aft_list,self.token_dict["["].unsqueeze(0)])
+                        s_token = bef_list[ind]
+                        aft_list=torch.cat([aft_list,s_token.unsqueeze(0)])
+                        aft_list=torch.cat([aft_list,self.token_dict[":"].unsqueeze(0)])
+                        aft_list=torch.cat([aft_list,self.step_dict[mode]])
+                        aft_list=torch.cat([aft_list,self.token_dict[":"].unsqueeze(0)])
+                        aft_list=torch.cat([aft_list,self.w_dict[w_mode]])
+                        aft_list=torch.cat([aft_list,self.token_dict["]"].unsqueeze(0)])
+                    ind+=1
+
 
         return aft_list
 
@@ -250,12 +320,14 @@ class PPOTrainer(Trainer):
         # log(π_RL(y|x) / π_SFT(y|x)) = log(π_RL(y|x)) - log(π_SFT(y|x))
         ratio = log_prob_rl - log_prob_sft
         estimated_kl = (torch.exp(ratio) - 1) - ratio  # 二阶近似
+        # if action_mask is not None:
+        #     estimated_kl = (estimated_kl * action_mask).sum(dim=1) / action_mask.sum(dim=1)
+        # else:
+        #     estimated_kl = estimated_kl.mean(dim=1)
+        # estimated_kl = estimated_kl.unsqueeze(-1)  # 保持输出shape (B, 1)
         if action_mask is not None:
             estimated_kl = (estimated_kl * action_mask).sum(dim=1) / action_mask.sum(dim=1)
-        else:
-            estimated_kl = estimated_kl.mean(dim=1)
-        estimated_kl = estimated_kl.unsqueeze(-1)  # 保持输出shape (B, 1)
-
+        estimated_kl = estimated_kl.mean(dim=1, keepdim=True)
         penalized_reward = reward - self.cfg.kl_beta * estimated_kl
         return penalized_reward, estimated_kl
 
@@ -294,12 +366,16 @@ class PPOTrainer(Trainer):
         actor_log_probs, w_log_probs, step_log_probs = self.actor.forward_actor(
             completion, attention_mask, num_actions  # (B, num_actions)
         )
+
         # 参考模型（来自train_stage_1）预测动作log概率（用于KL对比）
         sft_log_probs, sft_w_log_probs, sft_step_log_probs = self.sft_model.forward_actor(
             completion, attention_mask, num_actions
         )  # (B, num_actions)
+
         # 估算每个 completion 的价值
-        values = self.critic.forward_critic(completion, attention_mask, num_actions).view(-1, 1)  # (B, 1)
+        values = self.critic.forward_critic(
+            completion, attention_mask, num_actions
+        ).view(-1, 1)  # (B, 1)
 
         # 构造原始提示的文本
         input_prompt = [self.tokenizer.decode(completion[i,:input_lengths[i]]) for i in range(completion.size(0))]
@@ -313,7 +389,10 @@ class PPOTrainer(Trainer):
             input_w = diffw_list[i, input_lengths[i]:]
             input_step = diffstep_list[i, input_lengths[i]:]
             # 裁剪新生成的动作 直到end前
-            indices = [i for i, sublist in enumerate(zip(res, res[1:])) if list(sublist) == target]
+            indices = [
+                i for i, (a, b) in enumerate(zip(res, res[1:]))
+                if a.item() == 220 and b.item() == 50256
+            ]
             if len(indices) > 0:
                 end = int(indices[0])
                 res = res[:end]
@@ -338,7 +417,11 @@ class PPOTrainer(Trainer):
             res = re.sub(self.pattern, r'\1', res)
             output_prompt.append(res)
 
+        print(output_prompt)
+        print("input_prompt:",input_prompt)
+
         reward = self.scorer.get_score_batched(prompts = output_prompt, plain_texts = input_prompt).unsqueeze(1) # (B, 1)
+        # reward = torch.clamp(reward, min=0, max=10)
 
         if self.debug:
             print("actor_log_probs", actor_log_probs.shape) # torch.Size([2, 23])
@@ -419,7 +502,7 @@ class PPOTrainer(Trainer):
         scaler = GradScaler(enabled = self.dtype != torch.float32)
 
         print(f"self.total_epochs: {self.total_epochs} self.train_dataloader:{len(self.train_dataloader)}")
-
+        total_steps = 1
         for epoch in range(self.total_epochs):
             # 遍历训练数据加载器
             for step, (prompt, input_masks, input_lengths) in enumerate(
@@ -431,7 +514,7 @@ class PPOTrainer(Trainer):
                     input_masks = input_masks.squeeze(1) # (2, 77)
 
                 prompt, input_masks, input_lengths = (
-                    prompt.to(self.device),
+                    prompt.to(self.device), # （B, T）
                     input_masks.to(self.device),
                     input_lengths.to(self.device),
                 )
@@ -447,7 +530,8 @@ class PPOTrainer(Trainer):
                     print("input_lengths", input_lengths) # tensor([62, 58], device='cuda:0')
                     print("prompt after cut", prompt.shape) # torch.Size([2, 62])
 
-                total_steps = step + epoch * len(self.train_dataloader) # 数据量//batch_size 225000
+                if (step+1) % self.cfg.accumulate_steps == 0:
+                    total_steps += 1
 
                 # 混合精度训练
                 with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
@@ -484,11 +568,16 @@ class PPOTrainer(Trainer):
                         experience.action_mask,
                     )
                     actor_loss = actor_loss_token + actor_loss_w + actor_loss_step
+                    original_actor_loss = actor_loss.clone().detach()
+                    actor_loss = actor_loss/self.cfg.accumulate_steps
 
                     scaler.scale(actor_loss).backward()
-                    scaler.step(self.actor_optimizer)
-                    self.actor_optimizer.zero_grad(set_to_none = True)
-                    actor_lossf = actor_loss.item()
+                    if (step+1) % self.cfg.accumulate_steps == 0:
+                        scaler.unscale_(self.actor_optimizer)  # ✨ 反scale，才能对真实梯度进行裁剪
+                        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
+                        scaler.step(self.actor_optimizer)
+                        self.actor_optimizer.zero_grad(set_to_none=True)
+                    actor_lossf = original_actor_loss.item()
 
                     # 价值网络更新
                     self.critic.train()
@@ -509,12 +598,18 @@ class PPOTrainer(Trainer):
                         experience.values,
                         experience.action_mask,
                     )
-
+                    original_critic_loss = critic_loss.clone().detach()
+                    critic_loss = critic_loss/self.cfg.accumulate_steps
                     scaler.scale(critic_loss).backward()
-                    scaler.step(self.critic_optimizer)
-                    self.critic_optimizer.zero_grad(set_to_none = True)
-                    critic_lossf = critic_loss.item()
-                    scaler.update()
+                    if (step+1) % self.cfg.accumulate_steps == 0:
+                        scaler.unscale_(self.critic_optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
+                        scaler.step(self.critic_optimizer)
+                        scaler.update()
+                        self.critic_optimizer.zero_grad(set_to_none=True)
+
+                    critic_lossf = original_critic_loss.item()
+
 
                 # 日志与检查点
                 self.writer.add_scalar("KL", experience.estimated_kl.mean(), total_steps)
