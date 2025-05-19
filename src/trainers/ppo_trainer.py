@@ -339,6 +339,7 @@ class PPOTrainer(Trainer):
             output_prompt.append(res)
 
         reward = self.scorer.get_score_batched(prompts = output_prompt, plain_texts = input_prompt).unsqueeze(1) # (B, 1)
+        # reward = torch.clamp(reward, min=0, max=10)
 
         if self.debug:
             print("actor_log_probs", actor_log_probs.shape) # torch.Size([2, 23])
