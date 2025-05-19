@@ -91,13 +91,13 @@ class PPOTrainer(Trainer):
         self.actor_optimizer = optim.Adam(
             self.actor.parameters(),
             lr=cfg.actor_lr,
-            betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
+            betas=(self.cfg.adam_beta1, self.cfg.adam_beta1),
         )
 
         self.critic_optimizer = optim.Adam(
             self.critic.parameters(),
             lr=cfg.critic_lr,
-            betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
+            betas=(self.cfg.adam_beta1, self.cfg.adam_beta1),
         )
 
         self.step=0

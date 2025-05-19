@@ -52,7 +52,7 @@ class PromptScorer:
 
         pipe = StableDiffusionDynamicPromptPipeline.from_pretrained(
             self.sdmodel_name,
-            # revision="fp16",
+            revision="fp16",
             torch_dtype=torch.float16,
             scheduler=dpm_scheduler,
         )
