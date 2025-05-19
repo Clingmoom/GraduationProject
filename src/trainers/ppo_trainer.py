@@ -487,6 +487,10 @@ class PPOTrainer(Trainer):
                     actor_loss = actor_loss_token + actor_loss_w + actor_loss_step
 
                     scaler.scale(actor_loss).backward()
+
+                    scaler.unscale_(self.actor_optimizer)  # ✨ 反scale，才能对真实梯度进行裁剪
+                    torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
+
                     scaler.step(self.actor_optimizer)
                     self.actor_optimizer.zero_grad(set_to_none = True)
                     actor_lossf = actor_loss.item()
@@ -512,6 +516,10 @@ class PPOTrainer(Trainer):
                     )
 
                     scaler.scale(critic_loss).backward()
+
+                    scaler.unscale_(self.critic_optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
+
                     scaler.step(self.critic_optimizer)
                     self.critic_optimizer.zero_grad(set_to_none = True)
                     critic_lossf = critic_loss.item()
