@@ -450,7 +450,8 @@ class PPOTrainer(Trainer):
                     print("input_lengths", input_lengths) # tensor([62, 58], device='cuda:0')
                     print("prompt after cut", prompt.shape) # torch.Size([2, 62])
 
-                total_steps = step + epoch * len(self.train_dataloader) # 数据量//batch_size 225000
+                if (step+1) % self.cfg.accumulate_steps == 0:
+                    total_steps = step + epoch * len(self.train_dataloader)  # 数据量//batch_size (2,225000) (3,150000)
 
                 # 混合精度训练
                 with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
@@ -491,7 +492,7 @@ class PPOTrainer(Trainer):
                     actor_loss = actor_loss/self.cfg.accumulate_steps
 
                     scaler.scale(actor_loss).backward()
-                    if (total_steps+1) % self.cfg.accumulate_steps == 0:
+                    if (step+1) % self.cfg.accumulate_steps == 0:
                         scaler.unscale_(self.actor_optimizer)  # ✨ 反scale，才能对真实梯度进行裁剪
                         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
                         scaler.step(self.actor_optimizer)
@@ -519,7 +520,7 @@ class PPOTrainer(Trainer):
                     )
                     original_critic_loss = critic_loss.clone().detach()
                     scaler.scale(critic_loss).backward()
-                    if (total_steps+1) % self.cfg.accumulate_steps == 0:
+                    if (step+1) % self.cfg.accumulate_steps == 0:
                         scaler.unscale_(self.critic_optimizer)
                         torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
                         scaler.step(self.critic_optimizer)
