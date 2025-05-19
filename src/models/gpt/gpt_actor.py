@@ -58,7 +58,7 @@ class GPTActor(nn.Module):
         """
         x (B, T)
         """
-        logits, diffw, diffstep = self.forward(x, attention_mask)  # logits = (B, T, voca_size)
+        logits, diffw, diffstep = self(x, attention_mask)  # logits = (B, T, voca_size)
         # token预测
         log_prob_all_vocab = F.log_softmax(logits[:, :-1, :], dim=2)  # (B, T-1, vocab_size)
         index = x[:, 1:].unsqueeze(-1)  # (B, T-1, 1)获取真实token索引
@@ -104,26 +104,23 @@ class GPTActor(nn.Module):
         total_length = min(max_input_length + random.randint(15, max_new_tokens), 154)
 
         if T < total_length:
-            # 用pad填充 idx 和 input_masks 至长度为 total_length 50256对应 eos_token
+            # 用pad填充 idx 和 input_masks 至长度为 total_length 50256对应 eos_token  (0, total_length - T)左边0个，右边total_length - T个
             idx = F.pad(idx, (0, total_length - T), value=int(50256))
             input_masks = F.pad(input_masks, (0, total_length - T), value=0.0)
         input_masks = input_masks.bool()
 
         diffw_list = torch.ones_like(idx) * 2 # 初始值：2
         diffstep_list = torch.ones_like(idx)  # 初始值：1
-
+        # 将整个batch从(B，max_input_length)->(B, max_input_length + random.randint(15, max_new_tokens)
         for curr_pos in range(min_input_length, total_length):
-            # forward the model to get the logits, diffw and diffstep for the index in the sequence
             # 在每个位置 模型前向传播
             logits, diffw, diffstep = self(idx[:, :curr_pos])  # B, T, vocab_size   B, T, 5   B, T, 3
 
-            # pluck the logits at the final step and scale by desired temperature
             # 只取最后一步 进行温度缩放
             logits = logits[:, -1, :] / temperature
             diffw = diffw[:, -1, :] / temperature
             diffstep = diffstep[:, -1, :] / temperature
 
-            # optionally crop the logits to only the top k options
             if top_k is not None:
                 # torch.topk 返回 按降序排列的最大值及其索引
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
@@ -132,12 +129,11 @@ class GPTActor(nn.Module):
                 # logits[logits < v[:, [-1]]] = -float('Inf')
                 logits[logits < v[:, -1:]] = -float('Inf')
 
-            # apply softmax to convert logits to (normalized) probabilities
             probs = F.softmax(logits, dim=-1)
-            # sample from the distribution
+
             next_id = torch.multinomial(probs, num_samples=1).view(-1) # 从概率分布中抽取 num_samples 个样本
             next_id = torch.where(input_masks[:, curr_pos], idx[:, curr_pos], next_id) # torch.where(condition, x, y) 三元操作符 condition 为 True，则选择 x，否则选择 y
-            # append sampled index to the running sequence and continue
+            # # 将采样索引追加到正在运行的序列中并继续
             idx[:, curr_pos] = next_id
 
             diffw_probs = F.softmax(diffw, dim=-1)
@@ -167,14 +163,15 @@ class GPTActor(nn.Module):
                                                                            max_new_tokens,
                                                                            temperature,
                                                                            top_k)  # completions = (B, T)
-
+        # completions可能包含gpt自己生成的<|endoftext|>
+        # 对于i,j位置的元素，即completions[i,j],如果为true，采用torch.ones_like(completions)[i,j]，即1
         attention_mask = torch.where(completions != int(50256),
                                      torch.ones_like(completions),
                                      torch.zeros_like(completions))
+
         action_mask = torch.ones_like(completions, dtype=torch.bool)
-        action_mask[:, :T] = 0.0
-        action_mask = action_mask[:, 1:]
-        # we can only take the minimum among all instances in this batch as common num_actions
+
+        # 只取 batch 中最长的序列 对应的新生成的token数量，方便后续统一处理
         num_actions = completions.size(1) - T
         return completions, attention_mask, num_actions, action_mask[:, -num_actions:], diffw_list, diffstep_list
 
