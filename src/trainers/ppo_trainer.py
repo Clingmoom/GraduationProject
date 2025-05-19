@@ -250,12 +250,14 @@ class PPOTrainer(Trainer):
         # log(π_RL(y|x) / π_SFT(y|x)) = log(π_RL(y|x)) - log(π_SFT(y|x))
         ratio = log_prob_rl - log_prob_sft
         estimated_kl = (torch.exp(ratio) - 1) - ratio  # 二阶近似
+        # if action_mask is not None:
+        #     estimated_kl = (estimated_kl * action_mask).sum(dim=1) / action_mask.sum(dim=1)
+        # else:
+        #     estimated_kl = estimated_kl.mean(dim=1)
+        # estimated_kl = estimated_kl.unsqueeze(-1)  # 保持输出shape (B, 1)
         if action_mask is not None:
             estimated_kl = (estimated_kl * action_mask).sum(dim=1) / action_mask.sum(dim=1)
-        else:
-            estimated_kl = estimated_kl.mean(dim=1)
-        estimated_kl = estimated_kl.unsqueeze(-1)  # 保持输出shape (B, 1)
-
+        estimated_kl = estimated_kl.mean(dim=1, keepdim=True)
         penalized_reward = reward - self.cfg.kl_beta * estimated_kl
         return penalized_reward, estimated_kl
 
@@ -485,15 +487,16 @@ class PPOTrainer(Trainer):
                         experience.action_mask,
                     )
                     actor_loss = actor_loss_token + actor_loss_w + actor_loss_step
+                    original_actor_loss = actor_loss.clone().detach()
+                    actor_loss = actor_loss/self.cfg.accumulate_steps
 
                     scaler.scale(actor_loss).backward()
-
-                    scaler.unscale_(self.actor_optimizer)  # ✨ 反scale，才能对真实梯度进行裁剪
-                    torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
-
-                    scaler.step(self.actor_optimizer)
-                    self.actor_optimizer.zero_grad(set_to_none = True)
-                    actor_lossf = actor_loss.item()
+                    if (total_steps+1) % self.cfg.accumulate_steps == 0:
+                        scaler.unscale_(self.actor_optimizer)  # ✨ 反scale，才能对真实梯度进行裁剪
+                        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
+                        scaler.step(self.actor_optimizer)
+                        self.actor_optimizer.zero_grad(set_to_none=True)
+                    actor_lossf = original_actor_loss.item()
 
                     # 价值网络更新
                     self.critic.train()
@@ -514,16 +517,17 @@ class PPOTrainer(Trainer):
                         experience.values,
                         experience.action_mask,
                     )
-
+                    original_critic_loss = critic_loss.clone().detach()
                     scaler.scale(critic_loss).backward()
+                    if (total_steps+1) % self.cfg.accumulate_steps == 0:
+                        scaler.unscale_(self.critic_optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
+                        scaler.step(self.critic_optimizer)
+                        scaler.update()
+                        self.critic_optimizer.zero_grad(set_to_none=True)
 
-                    scaler.unscale_(self.critic_optimizer)
-                    torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
+                    critic_lossf = original_critic_loss.item()
 
-                    scaler.step(self.critic_optimizer)
-                    self.critic_optimizer.zero_grad(set_to_none = True)
-                    critic_lossf = critic_loss.item()
-                    scaler.update()
 
                 # 日志与检查点
                 self.writer.add_scalar("KL", experience.estimated_kl.mean(), total_steps)

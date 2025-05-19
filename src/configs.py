@@ -24,7 +24,7 @@ class TrainingConfig:
     activation_checkpointing: bool = False
     finetune_method: str = ""
     total_epochs: int = 1
-    # accumulate_steps: int = 4 # 梯度累计 计数器
+    accumulate_steps: int = 10 # 梯度累计 计数器
     # SFT specific
     max_steps: int = 20000
     # PPO specific
