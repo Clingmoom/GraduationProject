@@ -167,8 +167,6 @@ class PPOTrainer(Trainer):
                     if token==self.token_dict[","] or token==self.token_dict["."]:
                         break
 
-
-
             try:
                 w_counts = torch.bincount(diffw_list[special_token_ind_list])
                 w_mode=int(torch.argmax(w_counts).item())
@@ -180,7 +178,6 @@ class PPOTrainer(Trainer):
                 mode=int(torch.argmax(counts).item())
             except:
                 mode=1
-
 
             for ind in special_token_ind_list:
                 aft_list=torch.cat([aft_list,self.token_dict["["].unsqueeze(0)])
@@ -216,7 +213,6 @@ class PPOTrainer(Trainer):
                         if token==self.token_dict[","] or token==self.token_dict["."]:
                             break
 
-
                     aft_list=torch.cat([aft_list,self.token_dict[","].unsqueeze(0)])
 
                     try:
@@ -231,7 +227,6 @@ class PPOTrainer(Trainer):
                     except:
                         mode=1
 
-
                     for ind in special_token_ind_list:
                         aft_list=torch.cat([aft_list,self.token_dict["["].unsqueeze(0)])
                         s_token = bef_list[ind]
@@ -242,7 +237,6 @@ class PPOTrainer(Trainer):
                         aft_list=torch.cat([aft_list,self.w_dict[w_mode]])
                         aft_list=torch.cat([aft_list,self.token_dict["]"].unsqueeze(0)])
                     ind+=1
-
 
         else:
             while ind < len(bef_list):
