@@ -422,7 +422,7 @@ class PPOTrainer(Trainer):
         scaler = GradScaler(enabled = self.dtype != torch.float32)
 
         print(f"self.total_epochs: {self.total_epochs} self.train_dataloader:{len(self.train_dataloader)}")
-
+        total_steps = 1
         for epoch in range(self.total_epochs):
             # 遍历训练数据加载器
             for step, (prompt, input_masks, input_lengths) in enumerate(
@@ -451,7 +451,7 @@ class PPOTrainer(Trainer):
                     print("prompt after cut", prompt.shape) # torch.Size([2, 62])
 
                 if (step+1) % self.cfg.accumulate_steps == 0:
-                    total_steps = step + epoch * len(self.train_dataloader)  # 数据量//batch_size (2,225000) (3,150000)
+                    total_steps += 1
 
                 # 混合精度训练
                 with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
