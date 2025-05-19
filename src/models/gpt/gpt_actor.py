@@ -173,6 +173,7 @@ class GPTActor(nn.Module):
 
         # 只取 batch 中最长的序列 对应的新生成的token数量，方便后续统一处理
         num_actions = completions.size(1) - T
+
         return completions, attention_mask, num_actions, action_mask[:, -num_actions:], diffw_list, diffstep_list
 
     # 动态生成序列及对应的权重和步数预测，直到遇到结束符

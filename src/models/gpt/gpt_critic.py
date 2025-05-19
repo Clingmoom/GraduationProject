@@ -28,7 +28,7 @@ class GPTCritic(GPTRewardModel):
         # Vt only depends on st
         values = values * attention_mask
         values = values[:, :-num_actions].mean(dim=1) # 只要原始 prompt 部分
-        if torch.isnan(values).any().item():
+        if torch.isnan(values).any().item(): # 如果 values中至少存在一个 NaN值
             print("values nan:" ,values.shape ,values)
             pdb.set_trace()
         return values  # (B, 1)

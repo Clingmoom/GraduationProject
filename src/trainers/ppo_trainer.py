@@ -366,12 +366,16 @@ class PPOTrainer(Trainer):
         actor_log_probs, w_log_probs, step_log_probs = self.actor.forward_actor(
             completion, attention_mask, num_actions  # (B, num_actions)
         )
+
         # 参考模型（来自train_stage_1）预测动作log概率（用于KL对比）
         sft_log_probs, sft_w_log_probs, sft_step_log_probs = self.sft_model.forward_actor(
             completion, attention_mask, num_actions
         )  # (B, num_actions)
+
         # 估算每个 completion 的价值
-        values = self.critic.forward_critic(completion, attention_mask, num_actions).view(-1, 1)  # (B, 1)
+        values = self.critic.forward_critic(
+            completion, attention_mask, num_actions
+        ).view(-1, 1)  # (B, 1)
 
         # 构造原始提示的文本
         input_prompt = [self.tokenizer.decode(completion[i,:input_lengths[i]]) for i in range(completion.size(0))]
