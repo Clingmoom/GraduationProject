@@ -32,22 +32,24 @@ class PPO_Dataset(Dataset):
 
         prompt_list = np.load(ROOT_DIR / "data" / "training_data" / "train_data.npy").tolist()
         prompt_list = [pre_process(prompt) for prompt in prompt_list]
-        self.tokens = tokenizer(
+        tokens = tokenizer(
             prompt_list,
             max_length=77,
             padding="max_length",
             truncation=True,
             return_tensors="pt"
         )
-        self.tokens['input_length'] = self.tokens['attention_mask'].sum(dim=1)
+        self.prompts = tokens['input_ids'] # token
+        self.attention_mask = tokens['attention_mask']
+        self.input_length = self.tokens['attention_mask'].sum(dim=1)
 
 
 
     def __len__(self):
-        return len(self.tokens)
+        return len(self.prompts)
 
     def __getitem__(self, idx):
-        return self.tokens['input_ids'][idx], self.tokens['attention_mask'][idx], self.tokens['input_length'][idx]
+        return self.prompts[idx], self.attention_mask[idx], self.input_length[idx]
         # (prompt, mask, input_length)
 
 # class PPO_Dataset(Dataset):
