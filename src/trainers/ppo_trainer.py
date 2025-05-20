@@ -71,13 +71,13 @@ class PPOTrainer(Trainer):
         }
 
         self.token_dict={
-            ",":self.actor.tokenizer.encode(","),
-            ".":self.actor.tokenizer.encode("."),
-            ":":self.actor.tokenizer.encode(":"),
-            " [":self.actor.tokenizer.encode(" ["),
-            "[":self.actor.tokenizer.encode("["),
-            "]":self.actor.tokenizer.encode("]"),
-            " ":self.actor.tokenizer.encode(" "),
+            ",":self.actor.tokenizer.encode(",")[0],
+            ".":self.actor.tokenizer.encode(".")[0],
+            ":":self.actor.tokenizer.encode(":")[0],
+            " [":self.actor.tokenizer.encode(" [")[0],
+            "[":self.actor.tokenizer.encode("[")[0],
+            "]":self.actor.tokenizer.encode("]")[0],
+            " ":self.actor.tokenizer.encode(" ")[0],
         }
 
         self.train_dataloader = DataLoader(
@@ -137,7 +137,7 @@ class PPOTrainer(Trainer):
         token = bef_list[ind]
         if not (token==self.token_dict[","] or token==self.token_dict["."]):
             # 如果不是逗号或句号 直接添加到aft_list，直到出现逗号、句号、空格  x1 x2 x3, y1 y2 y3 a[x1 ]
-            while not (token==self.token_dict[","] or token==self.token_dict[","] or token==self.token_dict[" "] or self.tokenizer.decode([token.long()]).startswith(" ")):
+            while not (token==self.token_dict[","] or token==self.token_dict["."] or token==self.token_dict[" "] or self.tokenizer.decode([token.long()]).startswith(" ")):
                 token = bef_list[ind]
                 aft_list=torch.cat([aft_list,token.unsqueeze(0)])
                 ind+=1
