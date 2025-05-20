@@ -166,7 +166,6 @@ class PPOTrainer(Trainer):
 
                     if token==self.token_dict[","] or token==self.token_dict["."]:
                         break
-            print("special_token_ind_list:",special_token_ind_list)
             try:
                 w_counts = torch.bincount(diffw_list[special_token_ind_list])
                 w_mode=int(torch.argmax(w_counts).item())
@@ -289,8 +288,7 @@ class PPOTrainer(Trainer):
                         aft_list=torch.cat([aft_list,self.w_dict[w_mode]])
                         aft_list=torch.cat([aft_list,self.token_dict["]"].unsqueeze(0)])
                     ind+=1
-
-
+        print(f"special_token_ind_list:{special_token_ind_list}")
         return aft_list
 
     def kl_penalized_reward(
