@@ -149,7 +149,6 @@ class PPOTrainer(Trainer):
                     break
             if ind<(len(bef_list)):
                 token = bef_list[ind]
-            print(f"index:{ind} prompt_length:{len(bef_list)}")
             # 获取特殊token的索引
             special_token_ind_list = []
             while ind<(len(bef_list)) and  not (token==self.token_dict[","] or token==self.token_dict["."]): #
@@ -403,11 +402,9 @@ class PPOTrainer(Trainer):
                 input_w = input_w[:end]
                 input_step = input_step[:end]
             # 把新生成的 token（res）+ 对应的 diffw 和 diffstep
-            print(self.tokenizer.decode(res))
             output_tokens = self.trans_token(res, input_w, input_step)
 
             res = self.tokenizer.decode( torch.cat([completion[i, :input_lengths[i]], output_tokens]) )
-            print(f"after trans_token prompt:{res}")
 
             end = res.find("[<|endoftext|>")
             if end > 0:
