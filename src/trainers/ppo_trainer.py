@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import torch
@@ -104,10 +105,10 @@ class PPOTrainer(Trainer):
             lr=cfg.critic_lr,
             betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
         )
-        total_train_step = torch.ceil(
+        total_train_step = math.ceil(
             self.cfg.train_per_epoch_steps * self.cfg.total_epochs / self.cfg.accumulate_steps
         )
-        warmup_steps = total_train_step * self.cfg.warmup_ratio
+        warmup_steps = int(total_train_step * self.cfg.warmup_ratio)
 
         self.actor_scheduler = get_linear_schedule_with_warmup(
             self.actor_optimizer,
@@ -578,6 +579,7 @@ class PPOTrainer(Trainer):
                         scaler.step(self.actor_optimizer)
                         scaler.update()
                         self.actor_optimizer.zero_grad(set_to_none=True)
+                        self.actor_scheduler.step()
                     actor_lossf = original_actor_loss.item()
 
                     # 价值网络更新
@@ -608,6 +610,7 @@ class PPOTrainer(Trainer):
                         scaler.step(self.critic_optimizer)
                         scaler.update()
                         self.critic_optimizer.zero_grad(set_to_none=True)
+                        self.critic_scheduler.step()
 
                     critic_lossf = original_critic_loss.item()
 
