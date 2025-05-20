@@ -371,10 +371,10 @@ class PPOTrainer(Trainer):
             completion, attention_mask, num_actions
         ).view(-1, 1)  # (B, 1)
 
-        print("prompt:", prompt)
-        print("completion:", completion)
-        print("actor_log_probs:", actor_log_probs)
-        print("w_log_probs:", w_log_probs)
+        # print("prompt:", prompt)
+        # print("completion:", completion)
+        # print("actor_log_probs:", actor_log_probs)
+        # print("w_log_probs:", w_log_probs)
         # 构造原始提示的文本
         input_prompt = [self.tokenizer.decode(completion[i,:input_lengths[i]]) for i in range(completion.size(0))]
         output_prompt=[]
@@ -384,7 +384,6 @@ class PPOTrainer(Trainer):
 
         for i in range(completion.size(0)):
             res = completion[i, input_lengths[i]:]
-            print("completion[i, input_lengths[i]:]:",res)
             input_w = diffw_list[i, input_lengths[i]:]
             input_step = diffstep_list[i, input_lengths[i]:]
             # 裁剪新生成的动作 直到end前
@@ -402,7 +401,6 @@ class PPOTrainer(Trainer):
                 res = res[:end]
                 input_w = input_w[:end]
                 input_step = input_step[:end]
-            print(res)
             # 把新生成的 token（res）+ 对应的 diffw 和 diffstep
             output_tokens = self.trans_token(res, input_w, input_step)
             res = self.tokenizer.decode( torch.cat([completion[i, :input_lengths[i]], output_tokens]) )
@@ -414,11 +412,8 @@ class PPOTrainer(Trainer):
             if end > 0:
                 res = res[:end]
             # res = re.sub(self.pattern, r'\1', res)
-            print(res)
-            output_prompt.append(res)
 
-        print(output_prompt)
-        print("input_prompt:",input_prompt)
+            output_prompt.append(res)
 
         reward = self.scorer.get_score_batched(prompts = output_prompt, plain_texts = input_prompt).unsqueeze(1) # (B, 1)
         # reward = torch.clamp(reward, min=0, max=10)
