@@ -136,7 +136,7 @@ class PPOTrainer(Trainer):
         ind=0
         token = bef_list[ind]
         if not (token==self.token_dict[","] or token==self.token_dict["."]):
-            # 如果不是逗号或句号 直接添加到aft_list，直到出现逗号、句号、空格
+            # 如果不是逗号或句号 直接添加到aft_list，直到出现逗号、句号、空格  x1x2x3,y1y2y3  a[x1x2x3,] y1
             while not (token==self.token_dict[","] or token==self.token_dict["."] or token==self.token_dict[" "]):
                 token = bef_list[ind]
                 aft_list=torch.cat([aft_list,token.unsqueeze(0)])
@@ -148,7 +148,7 @@ class PPOTrainer(Trainer):
             # 获取特殊token的索引
             special_token_ind_list = []
             while ind<(len(bef_list)) and  not (token==self.token_dict[","] or token==self.token_dict["."] or self.tokenizer.decode([token.long()]).startswith(" ")):
-
+                print("anchor 1")
                 if token==self.token_dict[" "]:
                     aft_list=torch.cat([aft_list,token.unsqueeze(0)])
                     ind+=1
@@ -157,7 +157,7 @@ class PPOTrainer(Trainer):
                     token = bef_list[ind]
                 else:
                     special_token_ind_list.append(ind)
-
+                    print("anchor 2")
                     ind+=1
                     if ind>=(len(bef_list)):
                         break
@@ -401,7 +401,7 @@ class PPOTrainer(Trainer):
                 input_w = input_w[:end]
                 input_step = input_step[:end]
             # 把新生成的 token（res）+ 对应的 diffw 和 diffstep
-            print(res)
+            print(self.tokenizer.decode(res))
             output_tokens = self.trans_token(res, input_w, input_step)
             res = self.tokenizer.decode( torch.cat([completion[i, :input_lengths[i]], output_tokens]) )
 
