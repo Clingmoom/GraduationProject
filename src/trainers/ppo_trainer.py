@@ -79,7 +79,7 @@ class PPOTrainer(Trainer):
             "]":self.actor.tokenizer.encode("]")[0],
             " ":self.actor.tokenizer.encode(" ")[0],
         }
-        to_tensor = lambda token_dict: {k: torch.tensor(v, device=device) for k, v in token_dict.items()}
+        to_tensor = lambda token_dict: {k: torch.tensor(v, device=device,dtype=torch.long) for k, v in token_dict.items()}
         self.token_dict = to_tensor(self.token_dict)
         self.w_dict = to_tensor(self.w_dict)
         self.step_dict = to_tensor(self.step_dict)
@@ -291,7 +291,6 @@ class PPOTrainer(Trainer):
                         aft_list=torch.cat([aft_list,self.w_dict[w_mode]])
                         aft_list=torch.cat([aft_list,self.token_dict["]"].unsqueeze(0)])
                     ind+=1
-        print(f"special_token_ind_list:{special_token_ind_list}")
         return aft_list
 
     def kl_penalized_reward(
