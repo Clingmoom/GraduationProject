@@ -8,7 +8,7 @@ from src.trainers import PPOTrainer
 # 内存碎片优化
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-WANDB_KEY = "16197653681231357252"
+WANDB_KEY = "31f49565acf4d198ed0a419fb67527f0668b9d03"
 def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_images_per_prompt):
     import wandb
     wandb.login(key=WANDB_KEY)
