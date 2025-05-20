@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import torch
@@ -8,7 +9,7 @@ from tqdm import tqdm
 from datetime import datetime
 from typing import cast, Tuple
 from torch.utils.data import DataLoader
-from transformers import GPT2Tokenizer
+from transformers import GPT2Tokenizer, get_linear_schedule_with_warmup
 from torch.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
@@ -29,17 +30,18 @@ class PPOTrainer(Trainer):
         sft_model: GPTActor,
         train_dataset,
         device,
-        num_images_per_prompt
+        num_images_per_prompt,
+        logger = None,
     ) -> None:
         super().__init__()
-        self.cfg = cfg
+        self.cfg = cast(TrainingConfig, cfg)
         self.run_name = f"{cfg.exp_name}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         print(f"self.run_name:{self.run_name}")
         self.device = device
         self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.max_new_tokens = 77
         self.pattern = r'\[([^]]*):0-1:1\.0\]'#r'\[(\s*\w+):0-1:1\.0\]'
-
+        self.logger = logger
         self.orig_actor = actor
         self.orig_critic = critic
         self.orig_sft_model = sft_model
@@ -71,14 +73,18 @@ class PPOTrainer(Trainer):
         }
 
         self.token_dict={
-            ",":self.actor.tokenizer.encode(","),
-            ".":self.actor.tokenizer.encode("."),
-            ":":self.actor.tokenizer.encode(":"),
-            " [":self.actor.tokenizer.encode(" ["),
-            "[":self.actor.tokenizer.encode("["),
-            "]":self.actor.tokenizer.encode("]"),
-            " ":self.actor.tokenizer.encode(" "),
+            ",":self.actor.tokenizer.encode(",")[0],
+            ".":self.actor.tokenizer.encode(".")[0],
+            ":":self.actor.tokenizer.encode(":")[0],
+            " [":self.actor.tokenizer.encode(" [")[0],
+            "[":self.actor.tokenizer.encode("[")[0],
+            "]":self.actor.tokenizer.encode("]")[0],
+            " ":self.actor.tokenizer.encode(" ")[0],
         }
+        to_tensor = lambda token_dict: {k: torch.tensor(v, device=device,dtype=torch.long) for k, v in token_dict.items()}
+        self.token_dict = to_tensor(self.token_dict)
+        self.w_dict = to_tensor(self.w_dict)
+        self.step_dict = to_tensor(self.step_dict)
 
         self.train_dataloader = DataLoader(
             train_dataset,
@@ -91,15 +97,29 @@ class PPOTrainer(Trainer):
         self.actor_optimizer = optim.Adam(
             self.actor.parameters(),
             lr=cfg.actor_lr,
-            betas=(self.cfg.adam_beta1, self.cfg.adam_beta1),
+            betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
         )
 
         self.critic_optimizer = optim.Adam(
             self.critic.parameters(),
             lr=cfg.critic_lr,
-            betas=(self.cfg.adam_beta1, self.cfg.adam_beta1),
+            betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
         )
+        total_train_step = math.ceil(
+            self.cfg.train_per_epoch_steps * self.cfg.total_epochs / self.cfg.accumulate_steps
+        )
+        warmup_steps = int(total_train_step * self.cfg.warmup_ratio)
 
+        self.actor_scheduler = get_linear_schedule_with_warmup(
+            self.actor_optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=total_train_step,
+        )
+        self.critic_scheduler = get_linear_schedule_with_warmup(
+            self.critic_optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=total_train_step,
+        )
         self.step=0
 
         self.writer = SummaryWriter(f"./logs/{self.run_name}", max_queue=50)
@@ -136,8 +156,8 @@ class PPOTrainer(Trainer):
         ind=0
         token = bef_list[ind]
         if not (token==self.token_dict[","] or token==self.token_dict["."]):
-            # 如果不是逗号或句号 直接添加到aft_list，直到出现逗号、句号、空格
-            while not (token==self.token_dict[","] or token==self.token_dict["."] or token==self.token_dict[" "]):
+            # 如果不是逗号或句号 直接添加到aft_list，直到出现逗号、句号、空格  x1 x2 x3, y1 y2 y3 a[x1 ]
+            while not (token==self.token_dict[","] or token==self.token_dict["."] or token==self.token_dict[" "] or self.tokenizer.decode([token.long()]).startswith(" ")):
                 token = bef_list[ind]
                 aft_list=torch.cat([aft_list,token.unsqueeze(0)])
                 ind+=1
@@ -147,8 +167,7 @@ class PPOTrainer(Trainer):
                 token = bef_list[ind]
             # 获取特殊token的索引
             special_token_ind_list = []
-            while ind<(len(bef_list)) and  not (token==self.token_dict[","] or token==self.token_dict["."] or self.tokenizer.decode([token.long()]).startswith(" ")):
-
+            while ind<(len(bef_list)) and  not (token==self.token_dict[","] or token==self.token_dict["."]): #
                 if token==self.token_dict[" "]:
                     aft_list=torch.cat([aft_list,token.unsqueeze(0)])
                     ind+=1
@@ -157,7 +176,6 @@ class PPOTrainer(Trainer):
                     token = bef_list[ind]
                 else:
                     special_token_ind_list.append(ind)
-
                     ind+=1
                     if ind>=(len(bef_list)):
                         break
@@ -166,9 +184,6 @@ class PPOTrainer(Trainer):
 
                     if token==self.token_dict[","] or token==self.token_dict["."]:
                         break
-
-
-
             try:
                 w_counts = torch.bincount(diffw_list[special_token_ind_list])
                 w_mode=int(torch.argmax(w_counts).item())
@@ -180,7 +195,6 @@ class PPOTrainer(Trainer):
                 mode=int(torch.argmax(counts).item())
             except:
                 mode=1
-
 
             for ind in special_token_ind_list:
                 aft_list=torch.cat([aft_list,self.token_dict["["].unsqueeze(0)])
@@ -216,7 +230,6 @@ class PPOTrainer(Trainer):
                         if token==self.token_dict[","] or token==self.token_dict["."]:
                             break
 
-
                     aft_list=torch.cat([aft_list,self.token_dict[","].unsqueeze(0)])
 
                     try:
@@ -231,7 +244,6 @@ class PPOTrainer(Trainer):
                     except:
                         mode=1
 
-
                     for ind in special_token_ind_list:
                         aft_list=torch.cat([aft_list,self.token_dict["["].unsqueeze(0)])
                         s_token = bef_list[ind]
@@ -242,7 +254,6 @@ class PPOTrainer(Trainer):
                         aft_list=torch.cat([aft_list,self.w_dict[w_mode]])
                         aft_list=torch.cat([aft_list,self.token_dict["]"].unsqueeze(0)])
                     ind+=1
-
 
         else:
             while ind < len(bef_list):
@@ -295,8 +306,6 @@ class PPOTrainer(Trainer):
                         aft_list=torch.cat([aft_list,self.w_dict[w_mode]])
                         aft_list=torch.cat([aft_list,self.token_dict["]"].unsqueeze(0)])
                     ind+=1
-
-
         return aft_list
 
     def kl_penalized_reward(
@@ -377,6 +386,10 @@ class PPOTrainer(Trainer):
             completion, attention_mask, num_actions
         ).view(-1, 1)  # (B, 1)
 
+        # print("prompt:", prompt)
+        # print("completion:", completion)
+        # print("actor_log_probs:", actor_log_probs)
+        # print("w_log_probs:", w_log_probs)
         # 构造原始提示的文本
         input_prompt = [self.tokenizer.decode(completion[i,:input_lengths[i]]) for i in range(completion.size(0))]
         output_prompt=[]
@@ -388,6 +401,7 @@ class PPOTrainer(Trainer):
             res = completion[i, input_lengths[i]:]
             input_w = diffw_list[i, input_lengths[i]:]
             input_step = diffstep_list[i, input_lengths[i]:]
+
             # 裁剪新生成的动作 直到end前
             indices = [
                 i for i, (a, b) in enumerate(zip(res, res[1:]))
@@ -403,9 +417,9 @@ class PPOTrainer(Trainer):
                 res = res[:end]
                 input_w = input_w[:end]
                 input_step = input_step[:end]
-
             # 把新生成的 token（res）+ 对应的 diffw 和 diffstep
             output_tokens = self.trans_token(res, input_w, input_step)
+
             res = self.tokenizer.decode( torch.cat([completion[i, :input_lengths[i]], output_tokens]) )
 
             end = res.find("[<|endoftext|>")
@@ -414,11 +428,9 @@ class PPOTrainer(Trainer):
             end = res.find("<|endoftext|>")
             if end > 0:
                 res = res[:end]
-            res = re.sub(self.pattern, r'\1', res)
-            output_prompt.append(res)
+            # res = re.sub(self.pattern, r'\1', res)
 
-        print(output_prompt)
-        print("input_prompt:",input_prompt)
+            output_prompt.append(res)
 
         reward = self.scorer.get_score_batched(prompts = output_prompt, plain_texts = input_prompt).unsqueeze(1) # (B, 1)
         # reward = torch.clamp(reward, min=0, max=10)
@@ -437,10 +449,10 @@ class PPOTrainer(Trainer):
         w_advantage = w_kl_penalized_reward - values
         step_advantage = step_kl_penalized_reward - values
 
-        # # advantage normalization ~ 标准化
-        # advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
-        # w_advantage = (w_advantage - w_advantage.mean()) / (w_advantage.std() + 1e-8)
-        # step_advantage = (step_advantage - step_advantage.mean()) / (step_advantage.std() + 1e-8)
+        # advantage normalization ~ 标准化
+        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
+        w_advantage = (w_advantage - w_advantage.mean()) / (w_advantage.std() + 1e-8)
+        step_advantage = (step_advantage - step_advantage.mean()) / (step_advantage.std() + 1e-8)
 
         if self.debug:
             print("kl_penalized_reward", kl_penalized_reward) # tensor([[5.7218],[4.0584]], device='cuda:0')
@@ -519,19 +531,8 @@ class PPOTrainer(Trainer):
                     input_lengths.to(self.device),
                 )
 
-                if self.debug:
-                    print(" --- Fit load prompt --- ")
-                    print("prompt", prompt.shape) # torch.Size([2, 77])
-
                 max_input_length = torch.max(input_lengths)
                 prompt = prompt[:, :max_input_length]
-
-                if self.debug:
-                    print("input_lengths", input_lengths) # tensor([62, 58], device='cuda:0')
-                    print("prompt after cut", prompt.shape) # torch.Size([2, 62])
-
-                if (step+1) % self.cfg.accumulate_steps == 0:
-                    total_steps += 1
 
                 # 混合精度训练
                 with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
@@ -576,7 +577,9 @@ class PPOTrainer(Trainer):
                         scaler.unscale_(self.actor_optimizer)  # ✨ 反scale，才能对真实梯度进行裁剪
                         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
                         scaler.step(self.actor_optimizer)
+                        scaler.update()
                         self.actor_optimizer.zero_grad(set_to_none=True)
+                        self.actor_scheduler.step()
                     actor_lossf = original_actor_loss.item()
 
                     # 价值网络更新
@@ -607,10 +610,20 @@ class PPOTrainer(Trainer):
                         scaler.step(self.critic_optimizer)
                         scaler.update()
                         self.critic_optimizer.zero_grad(set_to_none=True)
+                        self.critic_scheduler.step()
 
                     critic_lossf = original_critic_loss.item()
 
-
+                metrics = {
+                    "step": total_steps,
+                    "KL": experience.estimated_kl.mean(),
+                    "mean_advantage": experience.advantage.mean(),
+                    "mean_reward": experience.kl_penalized_reward.mean(),
+                    "mean_value": new_values.mean(),
+                    "Loss/actor/step": actor_lossf,
+                    "Loss/critic/step": critic_lossf,
+                }
+                self.logger.log(metrics)
                 # 日志与检查点
                 self.writer.add_scalar("KL", experience.estimated_kl.mean(), total_steps)
                 self.writer.add_scalar("mean_advantage", experience.advantage.mean(), total_steps)
@@ -621,13 +634,15 @@ class PPOTrainer(Trainer):
                 self.writer.add_scalar("Loss/w/step", actor_loss_w.item(), total_steps)
                 self.writer.add_scalar("Loss/step/step", actor_loss_step.item(), total_steps)
                 self.writer.add_scalar("Loss/critic/step", critic_lossf, total_steps)
-
+                total_steps+=1
                 pbar.set_description(
                     f"actor loss {round(actor_lossf, 3)}, critic loss {round(critic_lossf, 3)}"
                 )
 
-                if ((total_steps == 500 or (total_steps != 0 and total_steps % self.save_freq == 0))):
-                    self.save_states(total_steps)
+                # if ((total_steps == 500 or (total_steps != 0 and total_steps % self.save_freq == 0))):
+                #     self.save_states(total_steps)
+                if total_steps == (self.cfg.total_epochs * self.cfg.train_per_epoch_steps):
+                    break
 
-        self.save_states(is_last=True)
+        self.save_states(total_steps)
 
