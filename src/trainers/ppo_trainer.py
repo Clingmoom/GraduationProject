@@ -385,9 +385,6 @@ class PPOTrainer(Trainer):
             input_w = diffw_list[i, input_lengths[i]:]
             input_step = diffstep_list[i, input_lengths[i]:]
 
-            print(f"input_w:{input_w}")
-            print(f"input_step:{input_step}")
-
             # 裁剪新生成的动作 直到end前
             indices = [
                 i for i, (a, b) in enumerate(zip(res, res[1:]))
@@ -404,6 +401,7 @@ class PPOTrainer(Trainer):
                 input_w = input_w[:end]
                 input_step = input_step[:end]
             # 把新生成的 token（res）+ 对应的 diffw 和 diffstep
+            print(res)
             output_tokens = self.trans_token(res, input_w, input_step)
             res = self.tokenizer.decode( torch.cat([completion[i, :input_lengths[i]], output_tokens]) )
 
