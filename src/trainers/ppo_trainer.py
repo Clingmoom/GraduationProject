@@ -639,10 +639,10 @@ class PPOTrainer(Trainer):
                     f"actor loss {round(actor_lossf, 3)}, critic loss {round(critic_lossf, 3)}"
                 )
 
-                if ((total_steps == 500 or (total_steps != 0 and total_steps % self.save_freq == 0))):
-                    self.save_states(total_steps)
+                # if ((total_steps == 500 or (total_steps != 0 and total_steps % self.save_freq == 0))):
+                #     self.save_states(total_steps)
                 if total_steps == (self.cfg.total_epochs * self.cfg.train_per_epoch_steps):
                     break
 
-        self.save_states(is_last=True)
+        self.save_states(total_steps)
 
