@@ -41,7 +41,7 @@ class PPO_Dataset(Dataset):
         )
         self.prompts = tokens['input_ids'] # token
         self.attention_mask = tokens['attention_mask']
-        self.input_length = self.tokens['attention_mask'].sum(dim=1)
+        self.input_length = tokens['attention_mask'].sum(dim=1)
 
 
 
