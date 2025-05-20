@@ -136,9 +136,8 @@ class PPOTrainer(Trainer):
         ind=0
         token = bef_list[ind]
         if not (token==self.token_dict[","] or token==self.token_dict["."]):
-            print("anchor 0")
             # 如果不是逗号或句号 直接添加到aft_list，直到出现逗号、句号、空格  x1 x2 x3, y1 y2 y3 a[x1 ]
-            while not (token==self.token_dict[","] or token==self.token_dict["."] or token==self.token_dict[" "]):
+            while not (token==self.token_dict[","] or token==self.token_dict[","] or token==self.token_dict[" "] or self.tokenizer.decode([token.long()]).startswith(" ")):
                 token = bef_list[ind]
                 aft_list=torch.cat([aft_list,token.unsqueeze(0)])
                 ind+=1
@@ -146,11 +145,10 @@ class PPOTrainer(Trainer):
                     break
             if ind<(len(bef_list)):
                 token = bef_list[ind]
-            print(f"achor 3 index:{bef_list[ind:]}")
+            print(f"index:{ind} prompt_length:{len(bef_list)}")
             # 获取特殊token的索引
             special_token_ind_list = []
-            while ind<(len(bef_list)) and  not (token==self.token_dict[","] or token==self.token_dict["."]): #  or self.tokenizer.decode([token.long()]).startswith(" ")
-                print("anchor 1")
+            while ind<(len(bef_list)) and  not (token==self.token_dict[","] or token==self.token_dict["."]): #
                 if token==self.token_dict[" "]:
                     aft_list=torch.cat([aft_list,token.unsqueeze(0)])
                     ind+=1
@@ -159,7 +157,6 @@ class PPOTrainer(Trainer):
                     token = bef_list[ind]
                 else:
                     special_token_ind_list.append(ind)
-                    print("anchor 2")
                     ind+=1
                     if ind>=(len(bef_list)):
                         break
