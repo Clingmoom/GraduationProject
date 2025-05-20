@@ -572,6 +572,7 @@ class PPOTrainer(Trainer):
                         scaler.unscale_(self.actor_optimizer)  # ✨ 反scale，才能对真实梯度进行裁剪
                         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
                         scaler.step(self.actor_optimizer)
+                        scaler.update()
                         self.actor_optimizer.zero_grad(set_to_none=True)
                     actor_lossf = original_actor_loss.item()
 
