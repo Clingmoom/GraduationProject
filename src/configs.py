@@ -23,8 +23,6 @@ class TrainingConfig:
     pretrain: str = "huggingface"
     activation_checkpointing: bool = False
     finetune_method: str = ""
-    total_epochs: int = 1
-    accumulate_steps: int = 10 # 梯度累计 计数器
     # SFT specific
     max_steps: int = 20000
     # PPO specific
@@ -37,7 +35,10 @@ class TrainingConfig:
     kl_beta: float = 0.02
     adam_beta1: float = 0.9
     adam_beta2: float = 0.95
-
+    total_epochs: int = 1
+    train_per_epoch_steps: int = 3000
+    warmup_ratio = 0.05
+    accumulate_steps: int = 11 # 梯度累计 计数器
     def dict(self):
         return {k: str(v) for k, v in asdict(self).items()}
 

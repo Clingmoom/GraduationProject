@@ -8,7 +8,7 @@ from tqdm import tqdm
 from datetime import datetime
 from typing import cast, Tuple
 from torch.utils.data import DataLoader
-from transformers import GPT2Tokenizer
+from transformers import GPT2Tokenizer, get_linear_schedule_with_warmup
 from torch.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
@@ -33,7 +33,7 @@ class PPOTrainer(Trainer):
         logger = None,
     ) -> None:
         super().__init__()
-        self.cfg = cfg
+        self.cfg = cast(TrainingConfig, cfg)
         self.run_name = f"{cfg.exp_name}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         print(f"self.run_name:{self.run_name}")
         self.device = device
@@ -104,7 +104,21 @@ class PPOTrainer(Trainer):
             lr=cfg.critic_lr,
             betas=(self.cfg.adam_beta1, self.cfg.adam_beta2),
         )
+        total_train_step = torch.ceil(
+            self.cfg.train_per_epoch_steps * self.cfg.total_epochs / self.cfg.accumulate_steps
+        )
+        warmup_steps = total_train_step * self.cfg.warmup_ratio
 
+        self.actor_scheduler = get_linear_schedule_with_warmup(
+            self.actor_optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=total_train_step,
+        )
+        self.critic_scheduler = get_linear_schedule_with_warmup(
+            self.critic_optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=total_train_step,
+        )
         self.step=0
 
         self.writer = SummaryWriter(f"./logs/{self.run_name}", max_queue=50)
@@ -434,10 +448,10 @@ class PPOTrainer(Trainer):
         w_advantage = w_kl_penalized_reward - values
         step_advantage = step_kl_penalized_reward - values
 
-        # # advantage normalization ~ 标准化
-        # advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
-        # w_advantage = (w_advantage - w_advantage.mean()) / (w_advantage.std() + 1e-8)
-        # step_advantage = (step_advantage - step_advantage.mean()) / (step_advantage.std() + 1e-8)
+        # advantage normalization ~ 标准化
+        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
+        w_advantage = (w_advantage - w_advantage.mean()) / (w_advantage.std() + 1e-8)
+        step_advantage = (step_advantage - step_advantage.mean()) / (step_advantage.std() + 1e-8)
 
         if self.debug:
             print("kl_penalized_reward", kl_penalized_reward) # tensor([[5.7218],[4.0584]], device='cuda:0')
