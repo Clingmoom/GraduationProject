@@ -79,6 +79,10 @@ class PPOTrainer(Trainer):
             "]":self.actor.tokenizer.encode("]")[0],
             " ":self.actor.tokenizer.encode(" ")[0],
         }
+        to_tensor = lambda token_dict: {k: torch.tensor(v, device=device) for k, v in token_dict.items()}
+        self.token_dict = to_tensor(self.token_dict)
+        self.w_dict = to_tensor(self.w_dict)
+        self.step_dict = to_tensor(self.step_dict)
 
         self.train_dataloader = DataLoader(
             train_dataset,
