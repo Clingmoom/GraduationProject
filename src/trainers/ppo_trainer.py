@@ -526,9 +526,6 @@ class PPOTrainer(Trainer):
                     print("input_lengths", input_lengths) # tensor([62, 58], device='cuda:0')
                     print("prompt after cut", prompt.shape) # torch.Size([2, 62])
 
-                if (step+1) % self.cfg.accumulate_steps == 0:
-                    total_steps += 1
-
                 # 混合精度训练
                 with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
                     experience = self.make_experience(prompt, input_masks, input_lengths)
@@ -618,7 +615,7 @@ class PPOTrainer(Trainer):
                 self.writer.add_scalar("Loss/w/step", actor_loss_w.item(), total_steps)
                 self.writer.add_scalar("Loss/step/step", actor_loss_step.item(), total_steps)
                 self.writer.add_scalar("Loss/critic/step", critic_lossf, total_steps)
-
+                total_steps+=1
                 pbar.set_description(
                     f"actor loss {round(actor_lossf, 3)}, critic loss {round(critic_lossf, 3)}"
                 )
