@@ -29,7 +29,8 @@ class PPOTrainer(Trainer):
         sft_model: GPTActor,
         train_dataset,
         device,
-        num_images_per_prompt
+        num_images_per_prompt,
+        logger = None,
     ) -> None:
         super().__init__()
         self.cfg = cfg
@@ -39,7 +40,7 @@ class PPOTrainer(Trainer):
         self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.max_new_tokens = 77
         self.pattern = r'\[([^]]*):0-1:1\.0\]'#r'\[(\s*\w+):0-1:1\.0\]'
-
+        self.logger = logger
         self.orig_actor = actor
         self.orig_critic = critic
         self.orig_sft_model = sft_model
@@ -515,16 +516,8 @@ class PPOTrainer(Trainer):
                     input_lengths.to(self.device),
                 )
 
-                if self.debug:
-                    print(" --- Fit load prompt --- ")
-                    print("prompt", prompt.shape) # torch.Size([2, 77])
-
                 max_input_length = torch.max(input_lengths)
                 prompt = prompt[:, :max_input_length]
-
-                if self.debug:
-                    print("input_lengths", input_lengths) # tensor([62, 58], device='cuda:0')
-                    print("prompt after cut", prompt.shape) # torch.Size([2, 62])
 
                 # 混合精度训练
                 with torch.autocast(device_type = self.device_type, dtype = self.dtype, enabled = self.dtype != torch.float32):
@@ -604,7 +597,16 @@ class PPOTrainer(Trainer):
 
                     critic_lossf = original_critic_loss.item()
 
-
+                metrics = {
+                    "step": total_steps,
+                    "KL": experience.estimated_kl.mean(),
+                    "mean_advantage": experience.advantage.mean(),
+                    "mean_reward": experience.kl_penalized_reward.mean(),
+                    "mean_value": new_values.mean(),
+                    "Loss/actor/step": actor_lossf,
+                    "Loss/critic/step": critic_lossf,
+                }
+                self.logger.log(metrics)
                 # 日志与检查点
                 self.writer.add_scalar("KL", experience.estimated_kl.mean(), total_steps)
                 self.writer.add_scalar("mean_advantage", experience.advantage.mean(), total_steps)

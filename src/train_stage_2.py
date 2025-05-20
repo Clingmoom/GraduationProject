@@ -8,11 +8,18 @@ from src.trainers import PPOTrainer
 # 内存碎片优化
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
+WANDB_KEY = "16197653681231357252"
 def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_images_per_prompt):
+    import wandb
+    wandb.login(key=WANDB_KEY)
+
     cfg = get_configs("gpt2-medium")
     device = f"cuda:{card}"
-
+    wandb_logger=wandb.init(
+        project="基于提示优化的文本到图像生成方法研究",
+        name=exp_name,
+        config=cfg.__dict__,
+    )
     cfg.batch_size = batch_size
     cfg.exp_name = exp_name
     cfg.actor_weights = actor_weights
@@ -35,7 +42,7 @@ def train(batch_size, exp_name, actor_weights, critic_weights, epoch, card, num_
     critic.freeze_weights("lora")
 
     dataset = PPO_Dataset(device = device)
-    trainer = PPOTrainer(cfg, actor, critic, sft_model, dataset, num_images_per_prompt = num_images_per_prompt, device = device)
+    trainer = PPOTrainer(cfg, actor, critic, sft_model, dataset,logger = wandb_logger, num_images_per_prompt = num_images_per_prompt, device = device)
     trainer.fit()
 
 
