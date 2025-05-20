@@ -166,7 +166,7 @@ class PPOTrainer(Trainer):
 
                     if token==self.token_dict[","] or token==self.token_dict["."]:
                         break
-
+            print("special_token_ind_list:",special_token_ind_list)
             try:
                 w_counts = torch.bincount(diffw_list[special_token_ind_list])
                 w_mode=int(torch.argmax(w_counts).item())
@@ -386,6 +386,10 @@ class PPOTrainer(Trainer):
             res = completion[i, input_lengths[i]:]
             input_w = diffw_list[i, input_lengths[i]:]
             input_step = diffstep_list[i, input_lengths[i]:]
+
+            print(f"input_w:{input_w}")
+            print(f"input_step:{input_step}")
+
             # 裁剪新生成的动作 直到end前
             indices = [
                 i for i, (a, b) in enumerate(zip(res, res[1:]))
@@ -404,7 +408,7 @@ class PPOTrainer(Trainer):
             # 把新生成的 token（res）+ 对应的 diffw 和 diffstep
             output_tokens = self.trans_token(res, input_w, input_step)
             res = self.tokenizer.decode( torch.cat([completion[i, :input_lengths[i]], output_tokens]) )
-            print(res)
+
             end = res.find("[<|endoftext|>")
             if end > 0:
                 res = res[:end]
