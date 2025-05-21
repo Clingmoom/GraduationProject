@@ -1,3 +1,6 @@
+from copy import deepcopy
+from typing import Literal
+
 import torch
 import time
 import pickle
@@ -49,6 +52,12 @@ parser.add_argument(
     type=str,
     nargs="?",
     default="coco",
+)
+parser.add_argument(
+    "--mode",
+    type=str,
+    nargs="?",
+    default="dy_gpt2",
 )
 def main():
     import wandb
@@ -395,16 +404,27 @@ def main():
     os.makedirs(save_path, exist_ok=True)
 
     with torch.inference_mode():
-        gpt_sft = GPTActor.from_checkpoint(cfg, sft).to(device)
-        gpt_sft.eval()
         last_tic = time.time()
         for i in range(0, len(data), 25):
             if i + 25 < len(data):
                 p = i + 25
             else:
                 p = len(data)
+
             plain_texts = [s[0] for s in data[i:p]]  # ["A photo of a cat", "A photo of a dog"...]
-            prompt = [generate_gpt2(gpt_sft, s, device) for s in plain_texts]  # s:"A photo of a cat"
+            if opt_a.mode == 'gpt2':
+                pass
+            elif opt_a.mode == 'dynamic':
+                gpt_sft = GPTActor.from_checkpoint(cfg, sft).to(device)
+                gpt_sft.eval()
+                prompt = [generate_gpt2(gpt_sft, s, device) for s in plain_texts]  # s:"A photo of a cat"
+            elif opt_a.mode == 'original':
+                prompt = deepcopy(plain_texts)
+            elif opt_a.mode == 'sft':
+                pass
+            else:
+                raise ValueError("使用--mode提供有效的评估模式：[dynamic|original|sft|gpt2]")
+
             prompt_all += prompt
             if p > 998:
                 print(prompt, i)
