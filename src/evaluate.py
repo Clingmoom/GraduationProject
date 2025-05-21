@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import argparse, os
 
-from transformers import GPT2Tokenizer
+from transformers import GPT2TokenizerFast as GPT2Tokenizer
 from src.configs import get_configs, ROOT_DIR
 from src.models import GPTActor
 from src.trainers import PromptScorer
