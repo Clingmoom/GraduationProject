@@ -427,7 +427,7 @@ def main():
                     # 批次平均分
                     "aes_mean/batch": aes_scores.mean().item(),
                     "clip_mean/batch": clip_scores.mean().item(),
-                    "pick_mean/batch": pick_scores.mean().item(),
+                    "pick_mean/batch": torch.tensor(pick_scores).float().mean().item(),
                     # 分数分布直方图
                     "aes_hist/batch": wandb.Histogram(aes_scores.cpu().numpy()),
                     "clip_hist/batch": wandb.Histogram(clip_scores.cpu().numpy()),
@@ -445,8 +445,10 @@ def main():
                 ]
                 print("图片保存完成！")
             except Exception as e:
-                print(f"[Batch {i}-{p}] Error: {e}")
-                continue
+                raise e
+            # except:
+            #     print("error", prompt, i)
+            #     exit()
 
     print(opt_a.save, round(aes_sum.item() * 0.001, 2), round(clip_scores_sum.item() * 0.001, 2),
           round(pick_scores_sum.item() * 0.001, 2))
