@@ -1,5 +1,4 @@
 from copy import deepcopy
-from typing import Literal
 
 import torch
 import time
@@ -65,7 +64,7 @@ def main():
 
     opt_a = parser.parse_args()
     torch.manual_seed(opt_a.seed)
-    sft = opt_a.ckpt
+    use_model = opt_a.ckpt
     device = f"cuda:{opt_a.card}"
     cfg = get_configs("gpt2-medium")
 
@@ -413,15 +412,19 @@ def main():
 
             plain_texts = [s[0] for s in data[i:p]]  # ["A photo of a cat", "A photo of a dog"...]
             if opt_a.mode == 'gpt2':
-                pass
+                model = GPTActor.from_pretrained(cfg).to(device)
+                model.eval()
+                prompt = [generate_gpt2(model, s, device) for s in plain_texts]
             elif opt_a.mode == 'dynamic':
-                gpt_sft = GPTActor.from_checkpoint(cfg, sft).to(device)
-                gpt_sft.eval()
-                prompt = [generate_gpt2(gpt_sft, s, device) for s in plain_texts]  # s:"A photo of a cat"
+                model = GPTActor.from_checkpoint(cfg, use_model).to(device)
+                model.eval()
+                prompt = [generate_gpt2(model, s, device) for s in plain_texts]  # s:"A photo of a cat"
             elif opt_a.mode == 'original':
                 prompt = deepcopy(plain_texts)
             elif opt_a.mode == 'sft':
-                pass
+                model = GPTActor.from_checkpoint(cfg, use_model).to(device)
+                model.eval()
+                prompt = [generate_gpt2(model, s, device) for s in plain_texts]
             else:
                 raise ValueError("使用--mode提供有效的评估模式：[dynamic|original|sft|gpt2]")
 
@@ -429,10 +432,10 @@ def main():
             if p > 998:
                 print(prompt, i)
             try:
-                print("正在准备生成图像……")
+                print("正在生成图像……")
                 images = scorer.gen_image_batched(prompt)
                 image_features = scorer.get_clip_features(images, is_batched=True)
-                print("正在准备计算分数……")
+                print("正在计算分数……")
                 aes_scores = scorer.get_aesthetic_score(image_features, is_batched=True)
                 aes_sum += torch.Tensor(aes_scores).sum()
 
