@@ -35,7 +35,7 @@ if [ "$TASK_NAME" == "sft" ]; then
 elif [ "$TASK_NAME" == "ppo" ]; then
     python ./src/train_stage_2.py "$@"
 elif [ "$TASK_NAME" == "eval" ]; then
-    python ./src/evaluate.py --ckpt "ckpt/train/ppo_20250521-100258/actor_step3000.pt" "$@"
+    python ./src/evaluate.py "$@"
 else
     echo "❌ 错误：未知任务名 $TASK_NAME，只支持 [sft|ppo|eval]"
     exit 1

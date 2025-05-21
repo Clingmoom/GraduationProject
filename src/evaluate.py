@@ -18,7 +18,7 @@ parser.add_argument(
     "--ckpt",
     type=str,
     nargs="?",
-    default=ROOT_DIR / "ckpt" / "PAE" / "actor_step3000.pt",
+    default=ROOT_DIR / "ckpt" / "train" / "ppo_20250521-100258" /"actor_step3000.pt",
 )
 parser.add_argument(
     "--save",
