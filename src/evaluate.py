@@ -64,12 +64,15 @@ def main():
 
     def prepare_gpt2_input(prompt, device):
         print("正在准备gpt2的输入...")
-        enc = tokenizer
-        encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
-        decode = lambda l: enc.decode(l)
-        indices = encode(prompt)
-        x = (torch.tensor(indices, dtype=torch.long, device=device)[None, ...])
-        return x, decode
+        input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+        decode = lambda ids: tokenizer.decode(ids)
+        return input_ids, decode
+        # enc = tokenizer
+        # encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
+        # decode = lambda l: enc.decode(l)
+        # indices = encode(prompt)
+        # x = (torch.tensor(indices, dtype=torch.long, device=device)[None, ...])
+        # return x, decode
 
     step_dict = {
         0: torch.tensor(tokenizer.encode("0-0.5"), device=device),  # 0-0.5
