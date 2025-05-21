@@ -170,7 +170,7 @@ def main():
     def trans_token(bef_list, diffw_list, diffstep_list):
         if len(bef_list) == 0:
             return bef_list
-        aft_list = torch.tensor([], device=device)
+        aft_list = torch.tensor([], dtype=torch.long, device=device)
 
         ind = 0
         token = bef_list[ind]
@@ -331,7 +331,7 @@ def main():
                         aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
                     ind += 1
 
-        return aft_list
+        return aft_list.long()
 
     def generate_gpt2(model, prompt, device):
         temperature = 0.9
