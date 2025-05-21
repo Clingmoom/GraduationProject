@@ -424,8 +424,8 @@ def main():
                 print("✏️记录日志~")
                 wandb.log({
                     # 批次平均分
-                    "aes_mean/batch": aes_scores.mean().item(),
-                    "clip_mean/batch": clip_scores.mean().item(),
+                    "aes_mean/batch": torch.tensor(aes_scores).float().mean().item(),
+                    "clip_mean/batch": torch.tensor(clip_scores).float().mean().item(),
                     "pick_mean/batch": torch.tensor(pick_scores).float().mean().item(),
                     # 分数分布直方图
                     "aes_hist/batch": wandb.Histogram(aes_scores.cpu().numpy()),

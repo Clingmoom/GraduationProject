@@ -147,8 +147,11 @@ class PromptScorer:
 
     def get_aesthetic_score(self, image_features, is_batched=False):
         features = image_features.cpu().detach().numpy()
+        # 设置 L2 范数的计算顺序和轴
         order = 2
         axis = -1
+        # np.linalg.norm 计算输入数组 features 在指定 axis 上的范数
+        # np.atleast_1d 确保计算结果至少是一维数组，避免返回标量值
         l2 = np.atleast_1d(np.linalg.norm(features, order, axis))
         l2[l2 == 0] = 1
         im_emb_arr = features / np.expand_dims(l2, axis)
