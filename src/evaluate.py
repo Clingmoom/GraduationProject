@@ -196,7 +196,6 @@ def main():
                         break
                     token = bef_list[ind]
                 else:
-                    print("收集特殊token")
                     special_token_ind_list.append(ind)
 
                     ind += 1
