@@ -463,8 +463,7 @@ def main():
                 save = [x for x in range(i, p)]
                 [images[ii].save(
                     os.path.join(save_path, f"{save[ii]:05}.jpg")
-                ) for ii in range(len(images))
-                ]
+                ) for ii in range(len(images))]
                 print("图片保存完成！")
             except Exception as e:
                 raise e
