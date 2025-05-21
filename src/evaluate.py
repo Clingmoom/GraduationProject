@@ -63,6 +63,7 @@ def main():
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
     def prepare_gpt2_input(prompt, device):
+        print("正在准备gpt2的输入...")
         enc = tokenizer
         encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
         decode = lambda l: enc.decode(l)
@@ -171,6 +172,7 @@ def main():
         x, decode = prepare_gpt2_input(prompt, device)
         max_new_tokens = 75 - x.shape[-1]
         y, diffw_list, diffstep_list = model.generate_dy(x, max_new_tokens, temperature=temperature, top_k=top_k)
+        print("序列生成完成……")
         if y.shape == torch.Size([0]):
             return prompt
         y_0 = y[0].long()  # 生成的token序列
@@ -184,8 +186,9 @@ def main():
             y_0 = y_0[:end[0]]
             input_w = input_w[:end[0]]
             input_step = input_step[:end[0]]
-
+        print("正在准备编码……")
         res = decode(torch.cat([x[0], trans_token(y_0, input_w, input_step)]))
+        print("编码后的结果为：", res)
         end = res.find("[<|endoftext|>")
         if end > 0:
             res = res[:end]
@@ -239,8 +242,10 @@ def main():
             if p > 998:
                 print(prompt, i)
             try:
+                print("正在准备生成图像……")
                 images = scorer.gen_image_batched(prompt)
                 image_features = scorer.get_clip_features(images, is_batched=True)
+                print("正在准备计算分数……")
                 aes_scores = scorer.get_aesthetic_score(image_features, is_batched=True)
                 aes_sum += torch.Tensor(aes_scores).sum()
 
@@ -249,7 +254,7 @@ def main():
 
                 pick_scores = scorer.get_pick_score(plain_texts, images)
                 pick_scores_sum += torch.Tensor(pick_scores).sum()
-
+                print("✏️记录日志~")
                 wandb.log({
                     # 批次平均分
                     "aes_mean/batch": aes_scores.mean().item(),
@@ -264,17 +269,20 @@ def main():
                     "time/batch": time.time() - last_tic
                 })
                 last_tic = time.time()
+                print("即将保存图片……")
                 save = [x for x in range(i, p)]
                 [images[ii].save(
                     os.path.join(save_path, f"{save[ii]:05}.jpg")
                 ) for ii in range(len(images))
                 ]
+                print("图片保存完成！")
             except Exception as e:
                 print(f"[Batch {i}-{p}] Error: {e}")
                 continue
 
     print(opt_a.save, round(aes_sum.item() * 0.001, 2), round(clip_scores_sum.item() * 0.001, 2),
           round(pick_scores_sum.item() * 0.001, 2))
+
     npy_path = opt_a.save
     os.makedirs(npy_path, exist_ok=True)
     np.save(os.path.join(npy_path, "prompt.npy"), np.array(prompt_all))
