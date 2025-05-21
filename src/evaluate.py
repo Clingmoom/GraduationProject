@@ -175,241 +175,170 @@ def main():
     #                 insert_tokens(special_token_ind_list, w_mode, mode)
     #
     #     return aft_list
-    # def trans_token(bef_list, diffw_list, diffstep_list):
-    #     if len(bef_list) == 0:
-    #         return bef_list
-    #     aft_list = torch.tensor([], dtype=torch.long, device=device)
-    #
-    #     ind = 0
-    #     token = bef_list[ind]
-    #     if not (token == token_dict[","] or token == token_dict["."]):
-    #         special_token_ind_list = []
-    #
-    #         while not (
-    #             token == token_dict[","] or token == token_dict["."] or token == token_dict[" "] or tokenizer.decode(
-    #             [token.long()]).startswith(" ")):
-    #             token = bef_list[ind]
-    #             aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-    #             ind += 1
-    #
-    #             if ind >= (len(bef_list)):
-    #                 break
-    #         if ind < (len(bef_list)):
-    #             token = bef_list[ind]
-    #         while ind < (len(bef_list)) and not (token == token_dict[","] or token == token_dict["."]):
-    #             if token == token_dict[" "] or token == token_dict[","] or token == token_dict["."]:
-    #                 aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-    #                 ind += 1
-    #                 if ind >= (len(bef_list)):
-    #                     break
-    #                 token = bef_list[ind]
-    #             else:
-    #                 special_token_ind_list.append(ind)
-    #
-    #                 ind += 1
-    #                 if ind >= (len(bef_list)):
-    #                     break
-    #                 token = bef_list[ind]
-    #
-    #                 if token == token_dict[","] or token == token_dict["."]:
-    #                     break
-    #
-    #         try:
-    #             w_counts = torch.bincount(diffw_list[special_token_ind_list])
-    #             w_mode = int(torch.argmax(w_counts).item())
-    #         except:
-    #             w_mode = 2
-    #
-    #         try:
-    #             counts = torch.bincount(diffstep_list[special_token_ind_list])
-    #             mode = int(torch.argmax(counts).item())
-    #         except:
-    #             mode = 1
-    #
-    #         for ind in special_token_ind_list:
-    #             aft_list = torch.cat([aft_list, token_dict["["].unsqueeze(0)])
-    #             s_token = bef_list[ind]
-    #
-    #             aft_list = torch.cat([aft_list, s_token.unsqueeze(0)])
-    #             aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-    #             aft_list = torch.cat([aft_list, step_dict[mode]])
-    #             aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-    #             aft_list = torch.cat([aft_list, w_dict[w_mode]])
-    #             aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
-    #         ind += 1
-    #
-    #         while ind < len(bef_list):
-    #
-    #             token = bef_list[ind]
-    #
-    #             if not (token == token_dict[","] or token == token_dict["."]):
-    #                 aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-    #                 ind += 1
-    #             else:
-    #                 ind += 1
-    #                 if ind >= len(bef_list):
-    #                     break
-    #                 token = bef_list[ind]
-    #                 special_token_ind_list = []
-    #                 while not (token == token_dict[","] or token == token_dict["."]):
-    #
-    #                     special_token_ind_list.append(ind)
-    #
-    #                     ind += 1
-    #                     if ind >= (len(bef_list)):
-    #                         break
-    #                     token = bef_list[ind]
-    #
-    #                     if token == token_dict[","] or token == token_dict["."]:
-    #                         break
-    #
-    #                 aft_list = torch.cat([aft_list, token_dict[","].unsqueeze(0)])
-    #                 try:
-    #                     w_counts = torch.bincount(diffw_list[special_token_ind_list])
-    #                     w_mode = int(torch.argmax(w_counts).item())
-    #                 except:
-    #                     w_mode = 2
-    #
-    #                 try:
-    #                     counts = torch.bincount(diffstep_list[special_token_ind_list])
-    #                     mode = int(torch.argmax(counts).item())
-    #                 except:
-    #                     mode = 1
-    #
-    #                 for ind in special_token_ind_list:
-    #                     aft_list = torch.cat([aft_list, token_dict["["].unsqueeze(0)])
-    #                     s_token = bef_list[ind]
-    #                     aft_list = torch.cat([aft_list, s_token.unsqueeze(0)])
-    #                     aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-    #                     aft_list = torch.cat([aft_list, step_dict[mode]])
-    #                     aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-    #                     aft_list = torch.cat([aft_list, w_dict[w_mode]])
-    #                     aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
-    #                 ind += 1
-    #
-    #
-    #     else:
-    #         while ind < len(bef_list):
-    #
-    #             token = bef_list[ind]
-    #
-    #             if not (token == token_dict[","] or token == token_dict["."]):
-    #                 aft_list = torch.cat([aft_list, token.unsqueeze(0)])
-    #                 ind += 1
-    #             else:
-    #                 ind += 1
-    #                 if ind >= len(bef_list):
-    #                     break
-    #                 token = bef_list[ind]
-    #                 special_token_ind_list = []
-    #                 while not (token == token_dict[","] or token == token_dict["."]):
-    #
-    #                     special_token_ind_list.append(ind)
-    #
-    #                     ind += 1
-    #                     if ind >= (len(bef_list)):
-    #                         break
-    #                     token = bef_list[ind]
-    #
-    #                     if token == token_dict[","] or token == token_dict["."]:
-    #                         break
-    #
-    #                 aft_list = torch.cat([aft_list, token_dict[","].unsqueeze(0)])
-    #                 try:
-    #                     w_counts = torch.bincount(diffw_list[special_token_ind_list])
-    #                     w_mode = int(torch.argmax(w_counts).item())
-    #                 except:
-    #                     w_mode = 2
-    #
-    #                 try:
-    #                     counts = torch.bincount(diffstep_list[special_token_ind_list])
-    #                     mode = int(torch.argmax(counts).item())
-    #                 except:
-    #                     mode = 1
-    #
-    #                 for ind in special_token_ind_list:
-    #                     aft_list = torch.cat([aft_list, token_dict["["].unsqueeze(0)])
-    #                     s_token = bef_list[ind]
-    #                     aft_list = torch.cat([aft_list, s_token.unsqueeze(0)])
-    #                     aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-    #                     aft_list = torch.cat([aft_list, step_dict[mode]])
-    #                     aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-    #                     aft_list = torch.cat([aft_list, w_dict[w_mode]])
-    #                     aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
-    #                 ind += 1
-    #
-    #     return aft_list.long()
     def trans_token(bef_list, diffw_list, diffstep_list):
         if len(bef_list) == 0:
             return bef_list
+        aft_list = torch.tensor([], dtype=torch.long, device=device)
 
-        aft_list = torch.tensor([], device=device)
         ind = 0
+        token = bef_list[ind]
+        if not (token == token_dict[","] or token == token_dict["."]):
+            special_token_ind_list = []
 
-        def get_modes(special_token_ind_list):
+            while not (
+                token == token_dict[","] or token == token_dict["."] or token == token_dict[" "] or tokenizer.decode(
+                [token.long()]).startswith(" ")):
+                token = bef_list[ind]
+                aft_list = torch.cat([aft_list, token.unsqueeze(0)])
+                ind += 1
+
+                if ind >= (len(bef_list)):
+                    break
+            if ind < (len(bef_list)):
+                token = bef_list[ind]
+            while ind < (len(bef_list)) and not (token == token_dict[","] or token == token_dict["."]):
+                if token == token_dict[" "] or token == token_dict[","] or token == token_dict["."]:
+                    aft_list = torch.cat([aft_list, token.unsqueeze(0)])
+                    ind += 1
+                    if ind >= (len(bef_list)):
+                        break
+                    token = bef_list[ind]
+                else:
+                    special_token_ind_list.append(ind)
+
+                    ind += 1
+                    if ind >= (len(bef_list)):
+                        break
+                    token = bef_list[ind]
+
+                    if token == token_dict[","] or token == token_dict["."]:
+                        break
+
             try:
-                w_counts = torch.bincount(diffw_list[special_token_ind_list])  # 统计每个权重出现的次数
-                w_mode = int(torch.argmax(w_counts).item())  # 找到出现次数最多的权重
+                w_counts = torch.bincount(diffw_list[special_token_ind_list])
+                w_mode = int(torch.argmax(w_counts).item())
             except:
                 w_mode = 2
+
             try:
                 counts = torch.bincount(diffstep_list[special_token_ind_list])
                 mode = int(torch.argmax(counts).item())
             except:
                 mode = 1
-            return w_mode, mode
 
-        def insert_tokens(special_token_ind_list, w_mode, mode):
-            nonlocal aft_list
-            for idx in special_token_ind_list:
-                s_token = bef_list[idx]
-                parts = [
-                    token_dict["["].unsqueeze(0),
-                    s_token.unsqueeze(0),
-                    token_dict[":"].unsqueeze(0),
-                    step_dict[mode],
-                    token_dict[":"].unsqueeze(0),
-                    w_dict[w_mode],
-                    token_dict["]"].unsqueeze(0),
-                ]
-                aft_list = torch.cat([aft_list] + parts)
+            for ind in special_token_ind_list:
+                aft_list = torch.cat([aft_list, token_dict["["].unsqueeze(0)])
+                s_token = bef_list[ind]
 
-        while ind < len(bef_list):
-            token = bef_list[ind]
-            # 当前 token 是普通 token，继续收集
-            if token not in [token_dict[","], token_dict["."]]:
-                special_token_ind_list = []
-                # 是否是“词的开始”（避免子词或空格开头）
-                while ind < len(bef_list):
-                    token = bef_list[ind]
-                    if token in [token_dict[","], token_dict["."], token_dict[" "]] or tokenizer.decode(
-                        [token.long()]).startswith(" "):
-                        break
+                aft_list = torch.cat([aft_list, s_token.unsqueeze(0)])
+                aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
+                aft_list = torch.cat([aft_list, step_dict[mode]])
+                aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
+                aft_list = torch.cat([aft_list, w_dict[w_mode]])
+                aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
+            ind += 1
+
+            while ind < len(bef_list):
+
+                token = bef_list[ind]
+
+                if not (token == token_dict[","] or token == token_dict["."]):
                     aft_list = torch.cat([aft_list, token.unsqueeze(0)])
                     ind += 1
-                if ind >= len(bef_list):
-                    break
-            else:
-                # 遇到标点，标点后开始收集下一段 special tokens
-                punct_token = token
-                ind += 1
-                special_token_ind_list = []
-
-                while ind < len(bef_list):
-                    token = bef_list[ind]
-                    if token in [token_dict[","], token_dict["."]]:
+                else:
+                    ind += 1
+                    if ind >= len(bef_list):
                         break
-                    if not tokenizer.decode([token.long()]).startswith(" "):
+                    token = bef_list[ind]
+                    special_token_ind_list = []
+                    while not (token == token_dict[","] or token == token_dict["."]):
+
                         special_token_ind_list.append(ind)
+
+                        ind += 1
+                        if ind >= (len(bef_list)):
+                            break
+                        token = bef_list[ind]
+
+                        if token == token_dict[","] or token == token_dict["."]:
+                            break
+
+                    aft_list = torch.cat([aft_list, token_dict[","].unsqueeze(0)])
+                    try:
+                        w_counts = torch.bincount(diffw_list[special_token_ind_list])
+                        w_mode = int(torch.argmax(w_counts).item())
+                    except:
+                        w_mode = 2
+
+                    try:
+                        counts = torch.bincount(diffstep_list[special_token_ind_list])
+                        mode = int(torch.argmax(counts).item())
+                    except:
+                        mode = 1
+
+                    for ind in special_token_ind_list:
+                        aft_list = torch.cat([aft_list, token_dict["["].unsqueeze(0)])
+                        s_token = bef_list[ind]
+                        aft_list = torch.cat([aft_list, s_token.unsqueeze(0)])
+                        aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
+                        aft_list = torch.cat([aft_list, step_dict[mode]])
+                        aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
+                        aft_list = torch.cat([aft_list, w_dict[w_mode]])
+                        aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
                     ind += 1
 
-                aft_list = torch.cat([aft_list, punct_token.unsqueeze(0)])
 
-                if special_token_ind_list:
-                    w_mode, mode = get_modes(special_token_ind_list)
-                    insert_tokens(special_token_ind_list, w_mode, mode)
+        else:
+            while ind < len(bef_list):
 
-        return aft_list
+                token = bef_list[ind]
+
+                if not (token == token_dict[","] or token == token_dict["."]):
+                    aft_list = torch.cat([aft_list, token.unsqueeze(0)])
+                    ind += 1
+                else:
+                    ind += 1
+                    if ind >= len(bef_list):
+                        break
+                    token = bef_list[ind]
+                    special_token_ind_list = []
+                    while not (token == token_dict[","] or token == token_dict["."]):
+
+                        special_token_ind_list.append(ind)
+
+                        ind += 1
+                        if ind >= (len(bef_list)):
+                            break
+                        token = bef_list[ind]
+
+                        if token == token_dict[","] or token == token_dict["."]:
+                            break
+
+                    aft_list = torch.cat([aft_list, token_dict[","].unsqueeze(0)])
+                    try:
+                        w_counts = torch.bincount(diffw_list[special_token_ind_list])
+                        w_mode = int(torch.argmax(w_counts).item())
+                    except:
+                        w_mode = 2
+
+                    try:
+                        counts = torch.bincount(diffstep_list[special_token_ind_list])
+                        mode = int(torch.argmax(counts).item())
+                    except:
+                        mode = 1
+
+                    for ind in special_token_ind_list:
+                        aft_list = torch.cat([aft_list, token_dict["["].unsqueeze(0)])
+                        s_token = bef_list[ind]
+                        aft_list = torch.cat([aft_list, s_token.unsqueeze(0)])
+                        aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
+                        aft_list = torch.cat([aft_list, step_dict[mode]])
+                        aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
+                        aft_list = torch.cat([aft_list, w_dict[w_mode]])
+                        aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
+                    ind += 1
+
+        return aft_list.long()
 
     def generate_gpt2(model, prompt, device):
         temperature = 0.9
