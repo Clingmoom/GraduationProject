@@ -428,8 +428,8 @@ def main():
                     "clip_mean/batch": torch.tensor(clip_scores).float().mean().item(),
                     "pick_mean/batch": torch.tensor(pick_scores).float().mean().item(),
                     # 分数分布直方图
-                    "aes_hist/batch": wandb.Histogram(aes_scores.cpu().numpy()),
-                    "clip_hist/batch": wandb.Histogram(clip_scores.cpu().numpy()),
+                    "aes_hist/batch": wandb.Histogram(np.array(aes_scores)),
+                    "clip_hist/batch": wandb.Histogram(np.array(clip_scores)),
                     # 示例图像（取本批第 1 张）
                     "example_image": wandb.Image(images[0], caption=prompt[0]),
                     # 批次耗时
