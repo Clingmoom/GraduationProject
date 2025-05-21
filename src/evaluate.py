@@ -5,7 +5,7 @@ import numpy as np
 import argparse, os
 
 from transformers import GPT2Tokenizer
-from .configs import get_configs, ROOT_DIR
+from src.configs import get_configs, ROOT_DIR
 from src.models import GPTActor
 from src.trainers import PromptScorer
 
