@@ -34,8 +34,10 @@ if [ "$TASK_NAME" == "sft" ]; then
     python ./src/train_stage_1.py "$@"
 elif [ "$TASK_NAME" == "ppo" ]; then
     python ./src/train_stage_2.py "$@"
+elif [ "$TASK_NAME" == "eval" ]; then
+    python ./src/evaluate.py "$@"
 else
-    echo "❌ 错误：未知任务名 $TASK_NAME，只支持 [sft|ppo|test]"
+    echo "❌ 错误：未知任务名 $TASK_NAME，只支持 [sft|ppo|eval]"
     exit 1
 fi
 
