@@ -15,17 +15,13 @@
 
 """IO utilities."""
 
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-
+import itertools
 
 import glob
 from cmmd import embedding
 import jax
 import numpy as np
 from PIL import Image
-import tensorflow as tf
 import tqdm
 
 
@@ -52,10 +48,10 @@ def _center_crop_and_resize(im, size):
 
 
 def _read_image(path, reshape_to):
-  im = Image.open(path)
-  if reshape_to > 0:
-    im = _center_crop_and_resize(im, reshape_to)
-  return np.asarray(im).astype(np.float32)
+  with Image.open(path) as im:
+    if reshape_to > 0:
+      im = _center_crop_and_resize(im, reshape_to)
+    return np.asarray(im).astype(np.float32)
 
 
 def _get_img_generator_fn(path, reshape_to, max_count=-1):
@@ -89,6 +85,19 @@ def _get_img_generator_fn(path, reshape_to, max_count=-1):
 
   return gen, len(img_path_list)
 
+def _batched_dataset(generator_fn, batch_size):
+  """Returns an iterator that yields batches of images from the generator."""
+  def chunked(iterable, size):
+    it = iter(iterable)
+    while True:
+      chunk = list(itertools.islice(it, size))
+      if not chunk:
+        return
+      if len(chunk) < size:
+        break  # drop remainder
+      yield np.stack(chunk)
+
+  return chunked(generator_fn(), batch_size)
 
 def compute_embeddings_for_dir(
     img_dir,
@@ -123,34 +132,53 @@ def compute_embeddings_for_dir(
       img_dir, reshape_to=embedding_model.input_image_size, max_count=max_count
   )
   print(f'Calculating embeddings for {count} images from {img_dir}.')
-  dataset = tf.data.Dataset.from_generator(
-      generator_fn,
-      output_signature=tf.TensorSpec(shape=(None, None, 3), dtype=tf.float32),
-  )
+
+
+  # dataset = tf.data.Dataset.from_generator(
+  #     generator_fn,
+  #     output_signature=tf.TensorSpec(shape=(None, None, 3), dtype=tf.float32),
+  # )
   per_device_batch_size = batch_size // jax.device_count()
-  dataset = dataset.batch(per_device_batch_size, drop_remainder=True)
-  dataset = dataset.batch(jax.device_count(), drop_remainder=True)
-  dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
+  # dataset = dataset.batch(per_device_batch_size, drop_remainder=True)
+  # dataset = dataset.batch(jax.device_count(), drop_remainder=True)
+  # dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
 
+  # 批两层：每个设备一组 batch
   all_embs = []
-  for batch in tqdm.tqdm(dataset, total=count // batch_size):
-    image_batch = jax.tree_map(np.asarray, batch)
-
-    # Normalize to the [0, 1] range.
-    image_batch = image_batch / 255.0
+  raw_batches = _batched_dataset(generator_fn, batch_size)
+  for outer_batch in tqdm.tqdm(raw_batches, total=count // batch_size):
+    image_batch = outer_batch.astype(np.float32) / 255.0
 
     if np.min(image_batch) < 0 or np.max(image_batch) > 1:
       raise ValueError(
-          'Image values are expected to be in [0, 1]. Found:'
-          f' [{np.min(image_batch)}, {np.max(image_batch)}].'
+        'Image values are expected to be in [0, 1]. Found: '
+        f'[{np.min(image_batch)}, {np.max(image_batch)}]'
       )
 
-    # Compute the embeddings using a pmapped function.
-    embs = np.asarray(
-        embedding_model.parallel_embed(image_batch)
-    )  # The output has shape (num_devices, batch_size, embedding_dim).
+    # 再 reshape 成 (num_devices, per_device_batch_size, H, W, 3)
+    image_batch = image_batch.reshape((jax.device_count(), per_device_batch_size) + image_batch.shape[1:])
+
+    embs = np.asarray(embedding_model.parallel_embed(image_batch))
     embs = embs.reshape((-1,) + embs.shape[2:])
     all_embs.append(embs)
+  # for batch in tqdm.tqdm(dataset, total=count // batch_size):
+  #   image_batch = jax.tree_map(np.asarray, batch)
+  #
+  #   # Normalize to the [0, 1] range.
+  #   image_batch = image_batch / 255.0
+  #
+  #   if np.min(image_batch) < 0 or np.max(image_batch) > 1:
+  #     raise ValueError(
+  #         'Image values are expected to be in [0, 1]. Found:'
+  #         f' [{np.min(image_batch)}, {np.max(image_batch)}].'
+  #     )
+  #
+  #   # Compute the embeddings using a pmapped function.
+  #   embs = np.asarray(
+  #       embedding_model.parallel_embed(image_batch)
+  #   )  # The output has shape (num_devices, batch_size, embedding_dim).
+  #   embs = embs.reshape((-1,) + embs.shape[2:])
+  #   all_embs.append(embs)
 
   all_embs = np.concatenate(all_embs, axis=0)
 
