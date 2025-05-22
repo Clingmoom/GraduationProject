@@ -42,24 +42,7 @@ class ClipEmbeddingModel:
     self._model = clip.MODELS[_CLIP_MODEL_NAME]()
     self._model_vars = clip.load_model_vars(_CLIP_MODEL_NAME)
     self.input_image_size = clip.IMAGE_RESOLUTION[_CLIP_MODEL_NAME]
-
-    # 👇 用静态参数包装 pmap，避免 JAX 抱怨
-    self._parallel_embed_fn = jax.pmap(
-      self._embed_fn, static_broadcasted_argnums=0
-    )
-  # def __init__(self):
-  #   self._model = clip.MODELS[_CLIP_MODEL_NAME]()
-  #   self._model_vars = clip.load_model_vars(_CLIP_MODEL_NAME)
-  #   self.input_image_size = clip.IMAGE_RESOLUTION[_CLIP_MODEL_NAME]
-  #   self.parallel_embed = jax.pmap(self.embed)
-
-  def _embed_fn(self, model_self, images):
-    images = _clip_preprocess(images, model_self.input_image_size)
-    image_embs, _ = model_self._model.apply(model_self._model_vars, images, None)
-    return image_embs
-
-  def parallel_embed(self, images):
-    return self._parallel_embed_fn(self, images)
+    self.parallel_embed = jax.pmap(self.embed)
 
   def embed(self, images):
     """Computes CLIP embeddings for the given images.
