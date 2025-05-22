@@ -55,5 +55,5 @@ class ClipEmbeddingModel:
       Embedding array of shape (batch_size, embedding_width).
     """
     images = _clip_preprocess(images, self.input_image_size)
-    image_embs, _ = self._model.apply(self._model_vars, images, None)
+    image_embs, _ = self._model.apply(self._model_vars, images, inputs_kv=images)
     return image_embs
