@@ -42,7 +42,12 @@ class ClipEmbeddingModel:
     self._model = clip.MODELS[_CLIP_MODEL_NAME]()
     self._model_vars = clip.load_model_vars(_CLIP_MODEL_NAME)
     self.input_image_size = clip.IMAGE_RESOLUTION[_CLIP_MODEL_NAME]
-    self.parallel_embed = jax.pmap(self.embed)
+    self._p_embed_fn = jax.pmap(self._embed_fn, static_broadcasted_argnums=0)
+
+  def _embed_fn(self, model_self, images):
+    images = _clip_preprocess(images, model_self.input_image_size)
+    image_embs, _ = model_self._model.apply(model_self._model_vars, images, None)
+    return image_embs
 
   def embed(self, images):
     """Computes CLIP embeddings for the given images.
@@ -55,5 +60,5 @@ class ClipEmbeddingModel:
       Embedding array of shape (batch_size, embedding_width).
     """
     images = _clip_preprocess(images, self.input_image_size)
-    image_embs, _ = self._model.apply(self._model_vars, images, inputs_kv=images)
+    image_embs, _ = self._model.apply(self._model_vars, images, None)
     return image_embs
