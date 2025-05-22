@@ -442,7 +442,7 @@ def main():
                 clip_scores = scorer.get_clip_score_batched(image_features, plain_texts)
                 clip_scores_sum += torch.Tensor(clip_scores).sum()
 
-                pick_scores = scorer.get_pick_score(plain_texts, images)
+                pick_scores = scorer.get_pick_score_with_softmax(plain_texts, images)
                 pick_scores_sum += torch.Tensor(pick_scores).sum()
                 print("✏️记录日志~")
                 wandb.log({
