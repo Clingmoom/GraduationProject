@@ -64,6 +64,44 @@ class PromptScorer:
         pipe.enable_xformers_memory_efficient_attention()
         self.diffusion_pipe = pipe
 
+    def get_pick_score_with_softmax(self, prompt, images):
+        if len(images) != len(prompt):
+            assert len(images) % len(prompt) == 0
+            copied_strings = []
+            for pmt in prompt:
+                copied_strings.extend([pmt] * 3)
+            prompt = copied_strings
+
+        image_inputs = self.pick_processor(
+            images=images,
+            padding=True,
+            truncation=True,  # 是否截断
+            max_length=77,
+            return_tensors="pt",
+        ).to(self.device)
+
+        text_inputs = self.pick_processor(
+            text=prompt,
+            padding=True,
+            truncation=True,
+            max_length=77,
+            return_tensors="pt",
+        ).to(self.device)
+
+        with torch.no_grad():
+            # embed
+            image_embs = self.pick_model.get_image_features(**image_inputs)
+            image_embs = image_embs / torch.norm(image_embs, dim=-1, keepdim=True)
+
+            text_embs = self.pick_model.get_text_features(**text_inputs)
+            text_embs = text_embs / torch.norm(text_embs, dim=-1, keepdim=True)
+
+            # score
+            scores = self.pick_model.logit_scale.exp() * (text_embs @ image_embs.T)[0]
+
+            probs = torch.softmax(scores, dim=-1)
+
+        return probs.cpu().tolist()
 
     def get_pick_score(self, prompt, images):
         # device = "cuda:7"
@@ -78,7 +116,7 @@ class PromptScorer:
         image_inputs = self.pick_processor(
             images=images,
             padding=True,
-            truncation=True,
+            truncation=True, # 是否截断
             max_length=77,
             return_tensors="pt",
         ).to(self.device)
@@ -120,8 +158,10 @@ class PromptScorer:
         tokens = clip.tokenize([prompt], truncate=True).to(self.device)
         with torch.no_grad():
             text_features = self.clip_model.encode_text(tokens)
+            # 特征 L2归一化
             image_features = image_features / image_features.norm(dim=1, keepdim=True)
             text_features = text_features / text_features.norm(dim=1, keepdim=True)
+            # 矩阵点积计算相似度
             logit = image_features @ text_features.t()
             score = logit.item()
         return score

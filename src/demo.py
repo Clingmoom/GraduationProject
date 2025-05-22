@@ -76,7 +76,6 @@ token_dict = {
     " ": torch.tensor(tokenizer.encode(" ")[0], device=device)
 }
 
-pattern = r'\[([^]]*):0-1:1\.0\]'  # r'\[(\s*\w+):0-1:1\.0\]'
 
 def trans_token(bef_list, diffw_list, diffstep_list):
     if len(bef_list) == 0:
