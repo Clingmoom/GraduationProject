@@ -10,7 +10,7 @@ from transformers import GPT2TokenizerFast as GPT2Tokenizer
 from src.configs import get_configs, ROOT_DIR
 from src.models import GPTActor
 from src.trainers import PromptScorer
-
+import torchvision.utils as vutils
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 WANDB_KEY = "31f49565acf4d198ed0a419fb67527f0668b9d03"
@@ -52,12 +52,7 @@ parser.add_argument(
     nargs="?",
     default="coco",
 )
-parser.add_argument(
-    "--mode",
-    type=str,
-    nargs="?",
-    default="dy_gpt2",
-)
+
 def main():
     import wandb
     wandb.login(key=WANDB_KEY)
@@ -75,12 +70,6 @@ def main():
         input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
         decode = lambda ids: tokenizer.decode(ids)
         return input_ids, decode
-        # enc = tokenizer
-        # encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
-        # decode = lambda l: enc.decode(l)
-        # indices = encode(prompt)
-        # x = (torch.tensor(indices, dtype=torch.long, device=device)[None, ...])
-        # return x, decode
 
     step_dict = {
         0: torch.tensor(tokenizer.encode("0-0.5"), device=device),  # 0-0.5
@@ -397,12 +386,11 @@ def main():
     )
 
     prompt_all = []
-    aes_sum, clip_scores_sum = [torch.tensor(0.0) for i in range(2)]
-
-    save_path = opt_a.save
-    os.makedirs(save_path, exist_ok=True)
+    pick_scores_sum = torch.tensor(0.0)
 
     with torch.inference_mode():
+        model = GPTActor.from_checkpoint(cfg, use_model).to(device)
+        model.eval()
         last_tic = time.time()
         for i in range(0, len(data), 25):
             if i + 25 < len(data):
@@ -411,84 +399,55 @@ def main():
                 p = len(data)
 
             plain_texts = [s[0] for s in data[i:p]]  # ["A photo of a cat", "A photo of a dog"...]
-            if opt_a.mode == 'gpt2':
-                model = GPTActor.from_pretrained(cfg).to(device)
-                model.eval()
-                prompt = [generate_gpt2(model, s, device) for s in plain_texts]
-            elif opt_a.mode == 'dynamic':
-                model = GPTActor.from_checkpoint(cfg, use_model).to(device)
-                model.eval()
-                prompt = [generate_gpt2(model, s, device) for s in plain_texts]  # s:"A photo of a cat"
-            elif opt_a.mode == 'original':
-                prompt = deepcopy(plain_texts)
-            elif opt_a.mode == 'sft':
-                model = GPTActor.from_checkpoint(cfg, use_model).to(device)
-                model.eval()
-                prompt = [generate_gpt2(model, s, device) for s in plain_texts]
-            else:
-                raise ValueError("使用--mode提供有效的评估模式：[dynamic|original|sft|gpt2]")
+            prompt = [generate_gpt2(model, s, device) for s in plain_texts]  # s:"A photo of a cat"
 
             prompt_all += prompt
             if p > 998:
                 print(prompt, i)
             try:
                 print("正在生成图像……")
-                images = scorer.gen_image_batched(prompt)
-                image_features = scorer.get_clip_features(images, is_batched=True)
-                print("正在计算分数……")
-                aes_scores = scorer.get_aesthetic_score(image_features, is_batched=True)
-                aes_sum += torch.Tensor(aes_scores).sum()
-
-                clip_scores = scorer.get_clip_score_batched(image_features, plain_texts)
-                clip_scores_sum += torch.Tensor(clip_scores).sum()
+                images = scorer.gen_image_batched(plain_texts)
+                dy_images = scorer.gen_image_batched(prompt)
+                short_prompt_index = 0
+                eval_model_index = 1
+                pick_scores = torch.Tensor(
+                    [scorer.get_pick_score(prompt, [img, dy_img])[eval_model_index]] for img, dy_img in zip(images, dy_images)
+                )
+                print(f"pick_scores:{pick_scores}")
+                pick_scores_sum += torch.Tensor(pick_scores).sum()
 
                 print("✏️记录日志~")
+                image_inx = 0
+                example_image = vutils.make_grid(
+                    [images[image_inx], dy_images[image_inx]],
+                    nrow=2,
+                    padding=20,         # 每张图之间 8 像素间隔
+                    pad_value=255      # 间隔填白色，看起来更清晰
+                )
                 wandb.log({
-                    # 批次平均分
-                    "aes_mean/batch": torch.tensor(aes_scores).float().mean().item(),
-                    "clip_mean/batch": torch.tensor(clip_scores).float().mean().item(),
-                    # 分数分布直方图
-                    "aes_hist/batch": wandb.Histogram(np.array(aes_scores)),
-                    "clip_hist/batch": wandb.Histogram(np.array(clip_scores)),
+                    "pick_mean/batch": pick_scores.float().mean().item(),
                     # 示例图像（取本批第 1 张）
-                    "example_image": wandb.Image(images[0], caption=prompt[0]),
+                    "example_image": wandb.Image(example_image, caption=f"left is short_prompt|right is dy_prompt\ndy_prompt:{prompt[image_inx]}"),
                     # 批次耗时
                     "time/batch": time.time() - last_tic
                 })
                 last_tic = time.time()
-                print("即将保存图片……")
-                save = [x for x in range(i, p)]
-                [images[ii].save(
-                    os.path.join(save_path, f"{save[ii]:05}.jpg")
-                ) for ii in range(len(images))]
-                print("图片保存完成！")
+
             except Exception as e:
                 raise e
-            # except:
-            #     print("error", prompt, i)
-            #     exit()
-
-    print(opt_a.save, round(aes_sum.item() * 0.001, 2), round(clip_scores_sum.item() * 0.001, 2))
-
-    npy_path = opt_a.save
-    os.makedirs(npy_path, exist_ok=True)
-    np.save(os.path.join(npy_path, "prompt.npy"), np.array(prompt_all))
+    pick_score = round(pick_scores_sum.item() / len(data), 3)
+    print(pick_score)
 
     data_dict = {
-        "aes": round(aes_sum.item() * 0.001, 2),
-        "clip": round(clip_scores_sum.item() * 0.001, 2),
+        "PickScore": pick_score,
     }
-
-    with open(os.path.join(npy_path, "data_dict.pickle"), "wb") as file:
-        pickle.dump(data_dict, file)
 
     toc = time.time()
     total_time = toc - tic
     print(f"time:{total_time}")
 
     wandb.log({
-        "eval/aes": data_dict["aes"],
-        "eval/clip": data_dict["clip"],
+        "eval/pickscore": data_dict["pickscore"],
         "eval/total_time": total_time
     })
     artifact = wandb.Artifact("eval_results", type="dataset")
