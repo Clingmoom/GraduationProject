@@ -442,14 +442,14 @@ def main():
                 clip_scores = scorer.get_clip_score_batched(image_features, plain_texts)
                 clip_scores_sum += torch.Tensor(clip_scores).sum()
 
-                pick_scores = scorer.get_pick_score_with_softmax(plain_texts, images)
+                pick_scores = torch.Tensor([scorer.get_pick_score_with_softmax(plain_text, image) for plain_text, image in zip(plain_texts,images)])
                 pick_scores_sum += torch.Tensor(pick_scores).sum()
                 print("✏️记录日志~")
                 wandb.log({
                     # 批次平均分
                     "aes_mean/batch": torch.tensor(aes_scores).float().mean().item(),
                     "clip_mean/batch": torch.tensor(clip_scores).float().mean().item(),
-                    "pick_mean/batch": torch.tensor(pick_scores).float().mean().item(),
+                    "pick_mean/batch": pick_scores.float().mean().item(),
                     # 分数分布直方图
                     "aes_hist/batch": wandb.Histogram(np.array(aes_scores)),
                     "clip_hist/batch": wandb.Histogram(np.array(clip_scores)),
