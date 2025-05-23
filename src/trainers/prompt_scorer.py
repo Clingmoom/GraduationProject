@@ -105,8 +105,9 @@ class PromptScorer:
             # score
             scores = self.pick_model.logit_scale.exp() * (text_embs @ image_embs.T)[0]
 
+            probs = torch.softmax(scores, dim=-1)
 
-        return scores.cpu().tolist()
+        return probs.cpu().tolist()
 
     def get_pick_score(self, prompt, images):
         # device = "cuda:7"
