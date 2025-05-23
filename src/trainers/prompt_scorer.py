@@ -105,9 +105,13 @@ class PromptScorer:
             # score
             scores = self.pick_model.logit_scale.exp() * (text_embs @ image_embs.T)[0]
 
-            probs = torch.softmax(scores, dim=-1)
+            # 对每一行做 softmax，表示每个文本对所有图的匹配概率分布
+            probs = torch.softmax(scores, dim=-1)  # shape: [B, B]
 
-        return probs.cpu().tolist()
+            # 对角线元素表示：每个 prompt 与它对应的图像的概率（正确配对）
+            pick_scores = probs.diag()  # shape: [B]
+
+        return (pick_scores * 100).cpu().tolist()
 
     def get_pick_score(self, prompt, images):
         # device = "cuda:7"
