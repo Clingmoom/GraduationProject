@@ -1,11 +1,9 @@
-from copy import deepcopy
-
 import torch
 import time
-import pickle
 import numpy as np
 import argparse, os
 
+from torchvision import transforms
 from transformers import GPT2TokenizerFast as GPT2Tokenizer
 from src.configs import get_configs, ROOT_DIR
 from src.models import GPTActor
@@ -433,8 +431,9 @@ def main():
 
                 print("✏️记录日志~")
                 image_inx = 0
+                to_tensor = transforms.ToTensor()
                 example_image = vutils.make_grid(
-                    [images[image_inx], dy_images[image_inx]],
+                    [to_tensor(images[image_inx]), to_tensor(dy_images[image_inx])],
                     nrow=2,
                     padding=20,         # 每张图之间 8 像素间隔
                     pad_value=255      # 间隔填白色，看起来更清晰
