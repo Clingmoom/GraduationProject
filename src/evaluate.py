@@ -472,7 +472,7 @@ def main():
             #     exit()
 
     print(opt_a.save, round(aes_sum.item() * 0.001, 2), round(clip_scores_sum.item() * 0.001, 2),
-          round(pick_scores_sum.item() * 0.001, 2))
+          round(pick_scores_sum.item() * 0.001, 3))
 
     npy_path = opt_a.save
     os.makedirs(npy_path, exist_ok=True)
@@ -481,7 +481,7 @@ def main():
     data_dict = {
         "aes": round(aes_sum.item() * 0.001, 2),
         "clip": round(clip_scores_sum.item() * 0.001, 2),
-        "pickscore": round(pick_scores_sum.item() * 0.001, 2),
+        "pickscore": round(pick_scores_sum.item() * 0.001, 3),
     }
 
     with open(os.path.join(npy_path, "data_dict.pickle"), "wb") as file:
