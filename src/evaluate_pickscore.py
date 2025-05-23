@@ -450,10 +450,6 @@ def main():
         "eval/pickscore": data_dict["pickscore"],
         "eval/total_time": total_time
     })
-    artifact = wandb.Artifact("eval_results", type="dataset")
-    artifact.add_file(os.path.join(opt_a.save, "prompt.npy"))
-    artifact.add_dir(opt_a.save)  # 整个 result 目录
-    wandb.log_artifact(artifact)
     wandb.finish()
 
 if __name__ == "__main__":
