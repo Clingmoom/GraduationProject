@@ -411,7 +411,7 @@ def main():
                 short_prompt_index = 0
                 eval_model_index = 1
                 pick_scores = torch.Tensor(
-                    [scorer.get_pick_score(prompt, [img, dy_img])[eval_model_index]] for img, dy_img in zip(images, dy_images)
+                    [scorer.get_pick_score(prompt, [img, dy_img])[eval_model_index] for img, dy_img in zip(images, dy_images)]
                 )
                 print(f"pick_scores:{pick_scores}")
                 pick_scores_sum += torch.Tensor(pick_scores).sum()
