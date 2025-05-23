@@ -410,9 +410,24 @@ def main():
                 dy_images = scorer.gen_image_batched(prompt)
                 short_prompt_index = 0
                 eval_model_index = 1
-                pick_scores = torch.Tensor(
-                    [scorer.get_pick_score(prompt, [img, dy_img])[eval_model_index] for img, dy_img in zip(images, dy_images)]
-                )
+
+                all_images = []
+                for img, dy_img in zip(images, dy_images):
+                    all_images.extend([img, dy_img])
+                all_prompts = []
+                for p in prompt:
+                    all_prompts.extend([p] * 2)
+
+                pick_scores_raw = scorer.get_pick_score(all_prompts, all_images)
+
+                # pick_scores = torch.Tensor(
+                #     [scorer.get_pick_score(prompt, [img, dy_img])[eval_model_index] for img, dy_img in zip(images, dy_images)]
+                # )
+
+                pick_scores = torch.Tensor([
+                    pick_scores_raw[i + eval_model_index] for i in range(0, len(pick_scores_raw), 2)
+                ])
+
                 print(f"pick_scores:{pick_scores}")
                 pick_scores_sum += torch.Tensor(pick_scores).sum()
 
