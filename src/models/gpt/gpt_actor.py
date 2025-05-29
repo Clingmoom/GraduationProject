@@ -19,8 +19,7 @@ class GPTActor(nn.Module):
         self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2-medium')
         self.tokenizer.pad_token = '<|endoftext|>'  # '<|endoftext|>'  self.tokenizer.eos_token
         # 构建Transformer解码器主干网络
-        self.transformer = TransformerDe
-        coder(cfg)
+        self.transformer = TransformerDecoder(cfg)
         # Final linear layer as language model head w/o softmax
         if cfg.lora_rank > 0:
             # LoRA（低秩适应）的线性层 lm_head:language model head
