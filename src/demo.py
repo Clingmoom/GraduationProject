@@ -85,7 +85,7 @@ def trans_token(bef_list, diffw_list, diffstep_list):
     if len(bef_list) == 0:
         return bef_list
 
-    aft_list = torch.tensor([], device=device)
+    aft_list = torch.tensor([], dtype=torch.long, device=device)
     ind = 0
 
     def get_modes(special_token_ind_list):
