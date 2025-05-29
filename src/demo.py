@@ -160,6 +160,7 @@ def generate_gpt2(model, prompt, device):
     x, decode = prepare_gpt2_input(prompt, device)
     max_new_tokens = 75 - x.shape[-1]
     y, diffw_list, diffstep_list = model.generate_dy(x, max_new_tokens, temperature=temperature, top_k=top_k)
+    print("序列生成完成……")
     if y.shape == torch.Size([0]):
         return prompt
     y_0 = y[0].long()
@@ -173,8 +174,9 @@ def generate_gpt2(model, prompt, device):
         y_0 = y_0[:end[0]]
         input_w = input_w[:end[0]]
         input_step = input_step[:end[0]]
-
+    print("正在准备编码……")
     res = decode(torch.cat([x[0], trans_token(y_0, input_w, input_step)]))
+    print("编码后的结果为：", res)
     end = res.find("[<|endoftext|>")
     if end > 0:
         res = res[:end]
