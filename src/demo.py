@@ -188,7 +188,8 @@ def generate_gpt2(model, prompt, device):
 
 
 with torch.inference_mode():
-    gpt_sft = torch.compile(GPTActor.from_checkpoint(cfg, sft)).to(device)
+    #gpt_sft = torch.compile(GPTActor.from_checkpoint(cfg, sft)).to(device)
+    gpt_sft = GPTActor.from_checkpoint(cfg, sft).to(device)
     gpt_sft.eval()
     result = generate_gpt2(gpt_sft, opt_a.prompt, device)
     print(result)
