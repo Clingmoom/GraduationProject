@@ -14,7 +14,7 @@ parser.add_argument(
     "--ckpt",
     type=str,
     nargs="?",
-    default="ckpt/PAE/actor_step3000.pt",
+    default="ckpt//train/ppo_20250521-100258/actor_step3000.pt",
 )
 parser.add_argument(
     "--prompt",
