@@ -44,15 +44,19 @@ cfg = get_configs("gpt2-medium")
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2", device=device)
 
 def prepare_gpt2_input(prompt, device):
-    enc = tokenizer
-    # 定义编码和解码函数，允许使用 文本结束 的特殊字符
-    encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
-    decode = lambda l: enc.decode(l)
-    indices = encode(prompt)
-    # 使用 None 在第0维添加一个新维度，使得张量的形状从 [n] 变为 [1, n]
-    # 其中 ... 表示保持 indices 的原始形状不变
-    x = (torch.tensor(indices, dtype=torch.long, device=device)[None, ...])
-    return x, decode
+    print("正在准备gpt2的输入...")
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+    decode = lambda ids: tokenizer.decode(ids)
+    return input_ids, decode
+    # enc = tokenizer
+    # # 定义编码和解码函数，允许使用 文本结束 的特殊字符
+    # encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
+    # decode = lambda l: enc.decode(l)
+    # indices = encode(prompt)
+    # # 使用 None 在第0维添加一个新维度，使得张量的形状从 [n] 变为 [1, n]
+    # # 其中 ... 表示保持 indices 的原始形状不变
+    # x = (torch.tensor(indices, dtype=torch.long, device=device)[None, ...])
+    # return x, decode
 
 step_dict = {
     0: torch.tensor(tokenizer.encode("0-0.5"), device=device),  # 0-0.5
@@ -156,6 +160,7 @@ def generate_gpt2(model, prompt, device):
     x, decode = prepare_gpt2_input(prompt, device)
     max_new_tokens = 75 - x.shape[-1]
     y, diffw_list, diffstep_list = model.generate_dy(x, max_new_tokens, temperature=temperature, top_k=top_k)
+    print("序列生成完成……")
     if y.shape == torch.Size([0]):
         return prompt
     y_0 = y[0].long()
@@ -169,8 +174,9 @@ def generate_gpt2(model, prompt, device):
         y_0 = y_0[:end[0]]
         input_w = input_w[:end[0]]
         input_step = input_step[:end[0]]
-
+    print("正在准备编码……")
     res = decode(torch.cat([x[0], trans_token(y_0, input_w, input_step)]))
+    print("编码后的结果为：", res)
     end = res.find("[<|endoftext|>")
     if end > 0:
         res = res[:end]
@@ -182,7 +188,8 @@ def generate_gpt2(model, prompt, device):
 
 
 with torch.inference_mode():
-    gpt_sft = torch.compile(GPTActor.from_checkpoint(cfg, sft)).to(device)
+    #gpt_sft = torch.compile(GPTActor.from_checkpoint(cfg, sft)).to(device)
+    gpt_sft = GPTActor.from_checkpoint(cfg, sft).to(device)
     gpt_sft.eval()
     result = generate_gpt2(gpt_sft, opt_a.prompt, device)
     print(result)
