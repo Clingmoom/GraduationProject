@@ -397,7 +397,7 @@ def main():
     )
 
     prompt_all = []
-    aes_sum, clip_scores_sum, pick_scores_sum = [torch.tensor(0.0) for i in range(3)]
+    aes_sum, clip_scores_sum = [torch.tensor(0.0) for i in range(2)]
 
     save_path = opt_a.save
     os.makedirs(save_path, exist_ok=True)
@@ -442,14 +442,11 @@ def main():
                 clip_scores = scorer.get_clip_score_batched(image_features, plain_texts)
                 clip_scores_sum += torch.Tensor(clip_scores).sum()
 
-                pick_scores = scorer.get_pick_score_with_softmax(plain_texts, images)
-                pick_scores_sum += torch.Tensor(pick_scores).sum()
                 print("✏️记录日志~")
                 wandb.log({
                     # 批次平均分
                     "aes_mean/batch": torch.tensor(aes_scores).float().mean().item(),
                     "clip_mean/batch": torch.tensor(clip_scores).float().mean().item(),
-                    "pick_mean/batch": torch.tensor(pick_scores).float().mean().item(),
                     # 分数分布直方图
                     "aes_hist/batch": wandb.Histogram(np.array(aes_scores)),
                     "clip_hist/batch": wandb.Histogram(np.array(clip_scores)),
@@ -471,8 +468,7 @@ def main():
             #     print("error", prompt, i)
             #     exit()
 
-    print(opt_a.save, round(aes_sum.item() * 0.001, 2), round(clip_scores_sum.item() * 0.001, 2),
-          round(pick_scores_sum.item() * 0.001, 2))
+    print(opt_a.save, round(aes_sum.item() * 0.001, 2), round(clip_scores_sum.item() * 0.001, 2))
 
     npy_path = opt_a.save
     os.makedirs(npy_path, exist_ok=True)
@@ -481,7 +477,6 @@ def main():
     data_dict = {
         "aes": round(aes_sum.item() * 0.001, 2),
         "clip": round(clip_scores_sum.item() * 0.001, 2),
-        "pickscore": round(pick_scores_sum.item() * 0.001, 2),
     }
 
     with open(os.path.join(npy_path, "data_dict.pickle"), "wb") as file:
@@ -494,7 +489,6 @@ def main():
     wandb.log({
         "eval/aes": data_dict["aes"],
         "eval/clip": data_dict["clip"],
-        "eval/pickscore": data_dict["pickscore"],
         "eval/total_time": total_time
     })
     artifact = wandb.Artifact("eval_results", type="dataset")

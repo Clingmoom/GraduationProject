@@ -35,7 +35,7 @@ class GPTActor(nn.Module):
 
         # 预测权重的线性层5分类（特定任务） 输入维度（Transformer隐藏层维度），输出维度
         self.predict_weight_token = nn.Linear(cfg.embedding_dim, 5, bias=False)
-        # 预测差分步数的线性层3分类（特定任务）
+        # 预测时间步的线性层3分类（特定任务）
         self.predict_diffstep_token = nn.Linear(cfg.embedding_dim, 3, bias=False)
 
     def forward(self, x: Tensor, attention_mask: Tensor = None):

@@ -64,13 +64,19 @@ class PromptScorer:
         pipe.enable_xformers_memory_efficient_attention()
         self.diffusion_pipe = pipe
 
-    def get_pick_score_with_softmax(self, prompt, images):
-        if len(images) != len(prompt):
-            assert len(images) % len(prompt) == 0
-            copied_strings = []
-            for pmt in prompt:
-                copied_strings.extend([pmt] * 3)
-            prompt = copied_strings
+    def eval_pick_score(self, prompt, images):
+        """
+        计算图片与文本之间的相似度，返回概率分布
+        :param prompt:
+        :param images:
+        :return:
+        """
+        # if len(images) != len(prompt):
+        #     assert len(images) % len(prompt) == 0
+        #     copied_strings = []
+        #     for pmt in prompt:
+        #         copied_strings.extend([pmt] * 3)
+        #     prompt = copied_strings
 
         image_inputs = self.pick_processor(
             images=images,
