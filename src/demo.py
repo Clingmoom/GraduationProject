@@ -44,15 +44,19 @@ cfg = get_configs("gpt2-medium")
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2", device=device)
 
 def prepare_gpt2_input(prompt, device):
-    enc = tokenizer
-    # 定义编码和解码函数，允许使用 文本结束 的特殊字符
-    encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
-    decode = lambda l: enc.decode(l)
-    indices = encode(prompt)
-    # 使用 None 在第0维添加一个新维度，使得张量的形状从 [n] 变为 [1, n]
-    # 其中 ... 表示保持 indices 的原始形状不变
-    x = (torch.tensor(indices, dtype=torch.long, device=device)[None, ...])
-    return x, decode
+    print("正在准备gpt2的输入...")
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+    decode = lambda ids: tokenizer.decode(ids)
+    return input_ids, decode
+    # enc = tokenizer
+    # # 定义编码和解码函数，允许使用 文本结束 的特殊字符
+    # encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
+    # decode = lambda l: enc.decode(l)
+    # indices = encode(prompt)
+    # # 使用 None 在第0维添加一个新维度，使得张量的形状从 [n] 变为 [1, n]
+    # # 其中 ... 表示保持 indices 的原始形状不变
+    # x = (torch.tensor(indices, dtype=torch.long, device=device)[None, ...])
+    # return x, decode
 
 step_dict = {
     0: torch.tensor(tokenizer.encode("0-0.5"), device=device),  # 0-0.5
