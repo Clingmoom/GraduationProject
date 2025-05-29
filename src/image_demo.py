@@ -12,10 +12,10 @@ if __name__=="__main__":
     pipe.to("cuda")
 
 
-    prompt_list=["a white horse on the green grass, anime style",
-    "a white horse on the green grass, [anime:0-1:1.5] style",
-    "a white horse on the green grass, detailed",
-    "a white horse on the green grass, [detailed:0.85-1:1]"]
+    prompt_list=["a red horse on the yellow grass, anime style",
+    "a red horse on the yellow grass, [anime:0-1:1.5] style",
+    "a red horse on the yellow grass, detailed",
+    "a red horse on the yellow grass, [detailed:0.85-1:1]"]
     for i in range(len(prompt_list)):
         prompt=prompt_list[i]
         image0 = pipe(prompt,generator=torch.Generator().manual_seed(1), num_inference_steps=10).images[0]
