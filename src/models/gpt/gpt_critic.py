@@ -24,7 +24,7 @@ class GPTCritic(GPTRewardModel):
         '''
         hidden = self.backbone(x, attention_mask)  # (B, T, vocab_size)
 
-        values = self.value_head(hidden).squeeze(-1)  # (B, T, 1)
+        values = self.value_head(hidden).squeeze(-1)  # (B, T, 1)->(B, T)
         # Vt only depends on st
         values = values * attention_mask
         values = values[:, :-num_actions].mean(dim=1) # 只要原始 prompt 部分

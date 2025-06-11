@@ -14,13 +14,13 @@ parser.add_argument(
     "--ckpt",
     type=str,
     nargs="?",
-    default="ckpt//train/ppo_20250521-100258/actor_step3000.pt",
+    default="ckpt/train/ppo_20250521-100258/actor_step3000.pt",
 )
 parser.add_argument(
     "--prompt",
     type=str,
     nargs="?",
-    default="a photo of a happy cat",
+    default="A fly lands on the horse, which means you will win soon.",
 )
 parser.add_argument(
     "--seed",
@@ -81,17 +81,19 @@ token_dict = {
 }
 
 
-def trans_token(bef_list:torch.tensor, diffw_list, diffstep_list):
+def trans_token(bef_list, diffw_list, diffstep_list):
     if len(bef_list) == 0:
         return bef_list
-    aft_list = torch.tensor([], device=device)
+    aft_list = torch.tensor([], dtype=torch.long, device=device)
 
     ind = 0
     token = bef_list[ind]
     if not (token == token_dict[","] or token == token_dict["."]):
+        special_token_ind_list = []
 
-
-        while not (token == token_dict[","] or token == token_dict[","] or token == token_dict[" "] or tokenizer.decode([token.long()]).startswith(" ")):
+        while not (
+            token == token_dict[","] or token == token_dict["."] or token == token_dict[" "] or tokenizer.decode(
+            [token.long()]).startswith(" ")):
             token = bef_list[ind]
             aft_list = torch.cat([aft_list, token.unsqueeze(0)])
             ind += 1
@@ -100,7 +102,6 @@ def trans_token(bef_list:torch.tensor, diffw_list, diffstep_list):
                 break
         if ind < (len(bef_list)):
             token = bef_list[ind]
-        special_token_ind_list= []
         while ind < (len(bef_list)) and not (token == token_dict[","] or token == token_dict["."]):
             if token == token_dict[" "] or token == token_dict[","] or token == token_dict["."]:
                 aft_list = torch.cat([aft_list, token.unsqueeze(0)])
@@ -184,17 +185,11 @@ def trans_token(bef_list:torch.tensor, diffw_list, diffstep_list):
                 for ind in special_token_ind_list:
                     aft_list = torch.cat([aft_list, token_dict["["].unsqueeze(0)])
                     s_token = bef_list[ind]
-
                     aft_list = torch.cat([aft_list, s_token.unsqueeze(0)])
-
                     aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-
                     aft_list = torch.cat([aft_list, step_dict[mode]])
-
                     aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-
                     aft_list = torch.cat([aft_list, w_dict[w_mode]])
-
                     aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
                 ind += 1
 
@@ -241,21 +236,15 @@ def trans_token(bef_list:torch.tensor, diffw_list, diffstep_list):
                 for ind in special_token_ind_list:
                     aft_list = torch.cat([aft_list, token_dict["["].unsqueeze(0)])
                     s_token = bef_list[ind]
-
                     aft_list = torch.cat([aft_list, s_token.unsqueeze(0)])
-
                     aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-
                     aft_list = torch.cat([aft_list, step_dict[mode]])
-
                     aft_list = torch.cat([aft_list, token_dict[":"].unsqueeze(0)])
-
                     aft_list = torch.cat([aft_list, w_dict[w_mode]])
-
                     aft_list = torch.cat([aft_list, token_dict["]"].unsqueeze(0)])
                 ind += 1
 
-    return aft_list
+    return aft_list.long()
 
 
 def generate_gpt2(model, prompt, device):
